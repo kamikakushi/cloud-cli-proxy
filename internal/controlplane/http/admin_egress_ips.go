@@ -202,8 +202,9 @@ func (h *AdminEgressIPsHandler) Create() nethttp.Handler {
 			ProxyConfig: req.ProxyConfig,
 		})
 		if err != nil {
-			if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
-				writeJSON(w, nethttp.StatusConflict, map[string]string{"error": "ip address already exists"})
+			errMsg := strings.ToLower(err.Error())
+			if strings.Contains(errMsg, "unique") || strings.Contains(errMsg, "constraint failed") || strings.Contains(errMsg, "duplicate") {
+				writeJSON(w, nethttp.StatusConflict, map[string]string{"error": "label already exists"})
 				return
 			}
 			h.logger.Error("create egress ip failed", "error", err)
@@ -271,6 +272,11 @@ func (h *AdminEgressIPsHandler) Update() nethttp.Handler {
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				writeJSON(w, nethttp.StatusNotFound, map[string]string{"error": "egress ip not found"})
+				return
+			}
+			errMsg := strings.ToLower(err.Error())
+			if strings.Contains(errMsg, "unique") || strings.Contains(errMsg, "constraint failed") || strings.Contains(errMsg, "duplicate") {
+				writeJSON(w, nethttp.StatusConflict, map[string]string{"error": "label already exists"})
 				return
 			}
 			h.logger.Error("update egress ip failed", "ip_id", ipID, "error", err)

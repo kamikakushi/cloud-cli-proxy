@@ -65,7 +65,8 @@ func TestMigration0003DropsEgressIPAddressUniqueAndPreservesBindings(t *testing.
 	}
 
 	for _, statement := range []string{
-		`INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-2', 'shared-label', '0.0.0.0')`,
+		// label 各不相同：0003 验证 ip_address 放开唯一，0004 起 label 另有 UNIQUE 约束
+		`INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-2', 'shared-label-2', '0.0.0.0')`,
 		`INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-3', 'third', '8.8.8.8')`,
 		`INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-4', 'fourth', '8.8.8.8')`,
 		`INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-5', 'empty-one', '')`,
@@ -100,8 +101,10 @@ func TestMigration0003DropsEgressIPAddressUniqueAndPreservesBindings(t *testing.
 		t.Fatal("foreign_key_check reported a violation after migration")
 	}
 
-	if _, err := db.ExecContext(ctx, `INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-null', 'null-ip', NULL)`); err == nil {
-		t.Fatal("ip_address should remain NOT NULL")
+	// 0004 起 ip_address 允许 NULL（未探测的出口地址）；完整语义由
+	// migration_0004_test.go 覆盖，此处仅确认不再被 NOT NULL 拦截。
+	if _, err := db.ExecContext(ctx, `INSERT INTO egress_ips (id, label, ip_address) VALUES ('egress-null', 'null-ip', NULL)`); err != nil {
+		t.Fatalf("ip_address should allow NULL after 0004: %v", err)
 	}
 
 	if err := migrator.RunMigrations(ctx, db, migrations.FS); err != nil {
