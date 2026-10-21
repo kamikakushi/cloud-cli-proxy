@@ -21,7 +21,7 @@ func NewDispatcher(client interface {
 
 func (d *Dispatcher) Dispatch(ctx context.Context, request agentapi.HostActionRequest) (agentapi.HostActionResponse, error) {
 	switch request.Action {
-	case agentapi.ActionCreateHost, agentapi.ActionStartHost, agentapi.ActionStopHost, agentapi.ActionRebuildHost, agentapi.ActionPrepareHost:
+	case agentapi.ActionCreateHost, agentapi.ActionStartHost, agentapi.ActionStopHost, agentapi.ActionRebuildHost, agentapi.ActionPrepareHost, agentapi.ActionSyncCredentials:
 	default:
 		return agentapi.HostActionResponse{}, fmt.Errorf("unsupported host action: %s", request.Action)
 	}

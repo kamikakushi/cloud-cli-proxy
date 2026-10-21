@@ -180,7 +180,7 @@ func NewRouter(deps Dependencies) nethttp.Handler {
 		mux.Handle("GET /v1/admin/dashboard/stats", adminGuard(dashboardHandler))
 
 		if deps.AdminUsers != nil {
-			usersHandler := NewAdminUsersHandler(deps.Logger, deps.AdminUsers, deps.EventRecorder)
+			usersHandler := NewAdminUsersHandler(deps.Logger, deps.AdminUsers, deps.EventRecorder, deps.HostActions)
 			mux.Handle("GET /v1/admin/users", adminGuard(usersHandler.List()))
 			mux.Handle("POST /v1/admin/users", adminGuard(usersHandler.Create()))
 			mux.Handle("GET /v1/admin/users/{userID}", adminGuard(usersHandler.Get()))

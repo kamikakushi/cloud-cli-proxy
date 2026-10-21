@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/zanel1u/cloud-cli-proxy/internal/agentapi"
 	"github.com/zanel1u/cloud-cli-proxy/internal/controlplane/credgen"
 	"github.com/zanel1u/cloud-cli-proxy/internal/store/repository"
 )
@@ -38,10 +39,11 @@ type AdminUsersHandler struct {
 	logger *slog.Logger
 	store  AdminUserStore
 	events EventRecorder
+	queue  HostActionQueuer // router.go 中的包级接口；nil 时跳过凭据实时下发
 }
 
-func NewAdminUsersHandler(logger *slog.Logger, store AdminUserStore, events EventRecorder) *AdminUsersHandler {
-	return &AdminUsersHandler{logger: logger, store: store, events: events}
+func NewAdminUsersHandler(logger *slog.Logger, store AdminUserStore, events EventRecorder, queue HostActionQueuer) *AdminUsersHandler {
+	return &AdminUsersHandler{logger: logger, store: store, events: events, queue: queue}
 }
 
 func (h *AdminUsersHandler) List() nethttp.Handler {
@@ -250,6 +252,10 @@ func (h *AdminUsersHandler) RegenerateCredentials() nethttp.Handler {
 			return
 		}
 
+		// 新凭据实时下发到该用户运行中的主机：否则容器内仍是旧密码/旧 key，
+		// 需等下次重建才生效，用户拿响应里的新 entry_password 会登录失败。
+		h.queueSyncCredentials(r.Context(), userID)
+
 		if h.events != nil {
 			if _, err := h.events.RecordEvent(r.Context(), repository.RecordEventParams{
 				UserID:   &userID,
@@ -273,6 +279,27 @@ func (h *AdminUsersHandler) RegenerateCredentials() nethttp.Handler {
 
 type updateStatusRequest struct {
 	Status string `json:"status"`
+}
+
+// queueSyncCredentials 为该用户所有运行中的主机排队 sync_credentials 动作。
+// 失败仅记录：凭据已落库，主机侧同步可由后续重建兜底，不应让 regenerate 请求失败。
+func (h *AdminUsersHandler) queueSyncCredentials(ctx context.Context, userID string) {
+	if h.queue == nil {
+		return
+	}
+	hosts, err := h.store.ListHostsByUserID(ctx, userID)
+	if err != nil {
+		h.logger.Warn("list hosts for credential sync failed", "user_id", userID, "error", err)
+		return
+	}
+	for _, host := range hosts {
+		if host.Status != "running" {
+			continue
+		}
+		if _, err := h.queue.QueueHostAction(ctx, host.ID, agentapi.ActionSyncCredentials, "admin", ""); err != nil {
+			h.logger.Warn("queue sync_credentials failed", "host_id", host.ID, "error", err)
+		}
+	}
 }
 
 func (h *AdminUsersHandler) UpdateStatus() nethttp.Handler {

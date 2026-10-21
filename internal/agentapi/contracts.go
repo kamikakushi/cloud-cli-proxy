@@ -12,6 +12,9 @@ const (
 	// ActionReloadHostBypass Phase 46/47 — Phase 46 仅占位（worker 写日志返回 nil），
 	// Phase 47 真实下发：从 host_bypass_snapshots pending 行读 rule-set，落盘并触发 nft set 原子更新。
 	ActionReloadHostBypass HostAction = "reload_host_bypass"
+	// ActionSyncCredentials 将最新凭据（entry password / inbound ssh keys）
+	// 推送进运行中的容器。凭据重新生成后无需重建主机即可登录。
+	ActionSyncCredentials HostAction = "sync_credentials"
 )
 
 type SSHKeyEntry struct {

@@ -117,6 +117,8 @@ func (w *Worker) Execute(ctx context.Context, request agentapi.HostActionRequest
 		// Phase 47 Plan 01：真实 reload 流程在 worker_bypass_reload.go。
 		// 旧 Phase 46 占位字面量已移除（Plan 47-01 Task 3 success_criteria）。
 		err = w.handleReloadHostBypass(ctx, request)
+	case agentapi.ActionSyncCredentials:
+		err = w.syncHostCredentials(ctx, request)
 	default:
 		err = fmt.Errorf("unsupported host action: %s", request.Action)
 	}
@@ -221,6 +223,8 @@ func actionToHostStatus(action agentapi.HostAction) string {
 	case agentapi.ActionPrepareHost:
 		return ""
 	case agentapi.ActionReloadHostBypass:
+		return "" // 不改变 host 状态
+	case agentapi.ActionSyncCredentials:
 		return "" // 不改变 host 状态
 	default:
 		return "stopped"
@@ -760,6 +764,27 @@ func (w *Worker) waitForSSH(ctx context.Context, request agentapi.HostActionRequ
 		Metadata: handoffMeta,
 	})
 
+	return nil
+}
+
+// syncHostCredentials 将数据库中该主机的最新凭据（entry password 与 inbound
+// ssh keys）推送进运行中的容器。凭据重新生成（regenerate credentials）后由
+// 控制面排队触发，无需重建主机即可用新凭据登录。
+func (w *Worker) syncHostCredentials(ctx context.Context, request agentapi.HostActionRequest) error {
+	containerName := firstNonEmpty(request.ContainerName, containerNameForHost(request.HostID))
+	if exists, err := w.containerExists(ctx, containerName); err != nil {
+		return err
+	} else if !exists {
+		return fmt.Errorf("sync credentials: container %s does not exist", containerName)
+	}
+	if running, err := w.containerRunning(ctx, containerName); err != nil {
+		return err
+	} else if !running {
+		return fmt.Errorf("sync credentials: container %s is not running", containerName)
+	}
+
+	w.syncContainerCredentials(ctx, request, containerName)
+	w.injectSSHKeys(ctx, request, containerName)
 	return nil
 }
 
