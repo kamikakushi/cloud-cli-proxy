@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,8 +13,8 @@ import (
 	"time"
 
 	"github.com/zanel1u/cloud-cli-proxy/internal/agentapi"
-	"github.com/zanel1u/cloud-cli-proxy/internal/store/repository"
 	runtimetasks "github.com/zanel1u/cloud-cli-proxy/internal/runtime/tasks"
+	"github.com/zanel1u/cloud-cli-proxy/internal/store/repository"
 )
 
 // mockWorkerRepo 是 WorkerRepo 的最小 mock 实现，用于 agent 层测试。
@@ -354,12 +355,21 @@ func TestServer_POSTHandler_PanicRecovery_Returns500(t *testing.T) {
 	}
 	body, _ := json.Marshal(req)
 
-	client := &http.Client{Timeout: 1 * time.Second}
+	// client 直连 unix socket：不配 DialContext 时请求会经环境代理转发，
+	// 代理对 "http://unix" 主机返回 502，破坏本测试（原作者环境靠 DNS 失败
+	// 走 t.Skip 侥幸跳过）。
+	client := &http.Client{
+		Timeout: 1 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", "/tmp/test-agent-500.sock")
+			},
+		},
+	}
 	resp, err := client.Post("http://unix/v1/host-actions", "application/json", bytes.NewReader(body))
 	if err != nil {
-		// unix socket transport 需要特殊配置，这里用 httptest 替代
-		// 跳过这个子测试，用前面的测试覆盖
-		t.Skip("unix socket test skipped, covered by handler-level tests above")
+		t.Fatalf("post to unix socket server: %v", err)
 	}
 	defer resp.Body.Close()
 

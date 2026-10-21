@@ -80,15 +80,17 @@ func (s *Server) Serve(ctx context.Context) error {
 	})
 
 	mux.HandleFunc("POST /v1/host-actions", func(w http.ResponseWriter, r *http.Request) {
+		// 声明在 defer 之前，使 panic 恢复闭包可直接复用已解码的请求
+		var request agentapi.HostActionRequest
+
 		defer func() {
 			if rec := recover(); rec != nil {
 				s.logger.Error("host-agent handler panic recovered",
 					"task_id", r.Context().Value("task_id"),
 					"panic", rec,
 				)
-				// 尝试从已解码的 request 中恢复 TaskID；如果解码失败则使用空值
-				var request agentapi.HostActionRequest
-				_ = json.NewDecoder(r.Body).Decode(&request)
+				// 直接复用主流程已解码的 request：body 此时已被消费，
+				// 重新 decode 只会得到 EOF 并把有效字段覆盖为零值。
 
 				fallback := agentapi.TaskStatusUpdate{
 					TaskID:       request.TaskID,
@@ -106,7 +108,6 @@ func (s *Server) Serve(ctx context.Context) error {
 			}
 		}()
 
-		var request agentapi.HostActionRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
