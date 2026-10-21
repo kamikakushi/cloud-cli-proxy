@@ -65,13 +65,13 @@ user-image: ## Build managed-user image (cloud desktop)
 # ── Build ────────────────────────────────────────────────────
 
 build: ## Build all artifacts for target platform
-	cd web/admin && pnpm build && cp -r dist ../../cmd/control-plane/dist
+	cd web/admin && pnpm build && rm -rf ../../cmd/control-plane/dist && cp -r dist ../../cmd/control-plane/dist
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/control-plane-$(GOOS)-$(GOARCH) ./cmd/control-plane
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -o bin/host-agent-$(GOOS)-$(GOARCH) ./cmd/host-agent
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "-s -w" -trimpath -o bin/cloud-claude-$(GOOS)-$(GOARCH) ./cmd/cloud-claude
 
 build-local: ## Build for current platform
-	cd web/admin && pnpm build && cp -r dist ../../cmd/control-plane/dist
+	cd web/admin && pnpm build && rm -rf ../../cmd/control-plane/dist && cp -r dist ../../cmd/control-plane/dist
 	go build -o bin/control-plane ./cmd/control-plane
 	go build -o bin/host-agent ./cmd/host-agent
 	go build -ldflags "-s -w" -trimpath -o bin/cloud-claude ./cmd/cloud-claude
