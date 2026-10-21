@@ -1,4 +1,4 @@
-image_name: managed-user:e2e
+image_name: ghcr.io/zanel1u/cloud-cli-proxy/managed-user:latest
 local_dev_image_name: cloud-cli-proxy/managed-user:v4-local
 base_image: ubuntu:24.04
 pull_policy: never-implicit-latest

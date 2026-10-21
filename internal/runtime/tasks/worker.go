@@ -1190,7 +1190,27 @@ func loadProxyPublicKey() string {
 	return strings.TrimSpace(string(data))
 }
 
+// shouldSkipPull 报告是否可以跳过 docker pull：IMAGE_PULL_POLICY=always 时
+// 恒为 false；默认策略下本地已存在该镜像即为 true。
+func shouldSkipPull(ctx context.Context, imageName string) bool {
+	if os.Getenv("IMAGE_PULL_POLICY") == "always" {
+		return false
+	}
+	_, err := dockerRunner(ctx, "image", "inspect", "--format", "{{.Id}}", imageName)
+	return err == nil
+}
+
+// pullImage 在镜像本地不存在时执行 docker pull。
+// 单宿主机产品默认 IMAGE_PULL_POLICY=if-not-present：本地已有镜像（构建产物或
+// 上次拉取）即跳过，避免对 registry 发起注定失败的请求（离线/国内网络下
+// 每次 create/rebuild 都产生 403/超时噪音）。需要强制跟最新镜像时设 always。
 func (w *Worker) pullImage(ctx context.Context, taskID, hostID, imageName string) {
+	if shouldSkipPull(ctx, imageName) {
+		slog.Info("image present locally, skipping pull",
+			"image", imageName, "policy", "if-not-present")
+		return
+	}
+
 	pullCtx, cancel := context.WithTimeout(ctx, pullImageTimeout)
 	defer cancel()
 
