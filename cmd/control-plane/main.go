@@ -49,7 +49,9 @@ func main() {
 	}
 
 	if cfg.AdminJWTSecret == "" {
-		slog.Warn("ADMIN_JWT_SECRET not set, admin API disabled")
+		slog.Warn("ADMIN_JWT_SECRET not set, admin API disabled: " +
+			"admin/portal login will 404 into the SPA and browsers show \"Unexpected token '<'\" JSON errors. " +
+			"Set ADMIN_JWT_SECRET (>=32 chars) to enable the admin API.")
 	}
 
 	controlPlane, err := app.New(ctx, cfg)
