@@ -435,7 +435,7 @@ function StatusCell({
     return (
       <span className="flex items-center gap-1.5 text-sm text-info">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        {stageLabel(stage)}
+        {stageLabel(stage ?? null)}
       </span>
     );
   }

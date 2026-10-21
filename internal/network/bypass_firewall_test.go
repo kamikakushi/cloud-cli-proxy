@@ -8,14 +8,14 @@ import (
 )
 
 // TestConfigureBypassFirewall_Order 验证 8 条规则按设计顺序进入 plan：
-//   1. mDNS drop  (5353)
-//   2. LLMNR drop (5355)
-//   3. NetBIOS-NS drop (137)
-//   4. NetBIOS-DGM drop (138)
-//   5. oifname=sb-tun0 accept
-//   6. uid+proxyIP+tcp 443 accept
-//   7. oifname=eth0 + @whitelist_v4 accept
-//   8. 链末 log drop
+//  1. mDNS drop  (5353)
+//  2. LLMNR drop (5355)
+//  3. NetBIOS-NS drop (137)
+//  4. NetBIOS-DGM drop (138)
+//  5. oifname=sb-tun0 accept
+//  6. uid+proxyIP+tcp 443 accept
+//  7. oifname=eth0 + @whitelist_v4 accept
+//  8. 链末 log drop
 //
 // "先 drop 后 accept" 是 nft 自上而下匹配语义下的关键 —— 任何白名单 accept
 // 规则都不能放行 mDNS / LLMNR / NetBIOS（T-47-09）。

@@ -38,10 +38,10 @@ func NewAdminHostFilesHandler(logger *slog.Logger) *AdminHostFilesHandler {
 }
 
 type hostFileEntry struct {
-	Name   string `json:"name"`
-	Path   string `json:"path"`
-	IsDir  bool   `json:"is_dir"`
-	Size   int64  `json:"size"`
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	IsDir   bool   `json:"is_dir"`
+	Size    int64  `json:"size"`
 	ModTime string `json:"mod_time"`
 }
 

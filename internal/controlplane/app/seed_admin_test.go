@@ -31,14 +31,14 @@ type fakeSeedAdminRepo struct {
 	listInboundErr        error
 
 	// counters
-	getByIdentifierCalls  int
-	getUserCalls          int
-	createUserCalls       int
-	updatePasswordCalls   int
-	updateEntryCalls      int
-	updateSSHKeysCalls    int
-	createSSHKeyCalls     int
-	listInboundCalls      int
+	getByIdentifierCalls int
+	getUserCalls         int
+	createUserCalls      int
+	updatePasswordCalls  int
+	updateEntryCalls     int
+	updateSSHKeysCalls   int
+	createSSHKeyCalls    int
+	listInboundCalls     int
 
 	// captured args
 	lastCreatedSSHKeyPub  string

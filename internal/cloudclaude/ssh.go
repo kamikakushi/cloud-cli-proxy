@@ -44,10 +44,10 @@ func ConnectAndRunClaude(cfg SSHConfig, claudeArgs []string, cwd string, proxyCo
 // ConnectAndRunClaudeV3 是 Phase 31 主入口。
 //
 // 流程：
-	//  1. 建立 conn-A（控制 + 远端探测） / conn-B（数据通道，本阶段保留接口）
-	//  2. 用 authResp 字段（ClaudeAccountID / ImageVersion / SupportsMergerfs）
-	//     补全 mountCfg；NoColor / Logger / LastSessionPath /
-	//     SyncSessionLock 取默认值
+//  1. 建立 conn-A（控制 + 远端探测） / conn-B（数据通道，本阶段保留接口）
+//  2. 用 authResp 字段（ClaudeAccountID / ImageVersion / SupportsMergerfs）
+//     补全 mountCfg；NoColor / Logger / LastSessionPath /
+//     SyncSessionLock 取默认值
 //  3. 调 MountWorkspace 按 cfg.Mode 调度三层 mount + 三段式进度 + banner
 //  4. 启动 ExecProxy（沿用 v2.0 行为）
 //  5. OAuth credentials 检查（Expired → 退出非 0，ExpiringSoon → 警告）

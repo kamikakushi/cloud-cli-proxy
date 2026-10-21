@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, X, RefreshCw } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 import { useHostLogs } from "@/hooks/use-hosts";
 import { Button } from "@/components/ui/button";
 import {

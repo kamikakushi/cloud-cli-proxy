@@ -293,9 +293,9 @@ func Test_Downgrade_CapabilityFromAuthResp(t *testing.T) {
 
 func Test_ParseMode(t *testing.T) {
 	cases := map[string]Mode{
-		"":             ModeAuto,
-		"auto":         ModeAuto,
-		"full":         ModeFull,
+		"":           ModeAuto,
+		"auto":       ModeAuto,
+		"full":       ModeFull,
 		"hot-only":   ModeHotOnly,
 		"sshfs-only": ModeSSHFSOnly,
 	}

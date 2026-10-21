@@ -170,4 +170,3 @@ func TestBootstrapErrorMapping(t *testing.T) {
 		})
 	}
 }
-

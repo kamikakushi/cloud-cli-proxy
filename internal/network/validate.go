@@ -39,9 +39,9 @@ func ValidateEgressBinding(ctx context.Context, v EgressValidator, hostID string
 func validateProxyBinding(record EgressIPRecord, hostID string) (EgressConfig, error) {
 	if len(record.ProxyConfig) == 0 {
 		return EgressConfig{}, &NetworkError{
-			Type:    ErrTunnelSetupFailed,
-			Message: "proxy type requires non-empty proxy_config",
-			HostID:  hostID,
+			Type:     ErrTunnelSetupFailed,
+			Message:  "proxy type requires non-empty proxy_config",
+			HostID:   hostID,
 			Metadata: map[string]any{"egress_ip_id": record.ID},
 		}
 	}
@@ -49,9 +49,9 @@ func validateProxyBinding(record EgressIPRecord, hostID string) (EgressConfig, e
 	var parsed map[string]any
 	if err := json.Unmarshal(record.ProxyConfig, &parsed); err != nil {
 		return EgressConfig{}, &NetworkError{
-			Type:    ErrTunnelSetupFailed,
-			Message: fmt.Sprintf("proxy_config is not valid JSON: %v", err),
-			HostID:  hostID,
+			Type:     ErrTunnelSetupFailed,
+			Message:  fmt.Sprintf("proxy_config is not valid JSON: %v", err),
+			HostID:   hostID,
 			Metadata: map[string]any{"egress_ip_id": record.ID},
 		}
 	}

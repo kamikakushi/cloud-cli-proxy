@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { BypassRule, BypassRuleType } from "@/lib/api/types/bypass";
+import type { BypassRuleType } from "@/lib/api/types/bypass";
 
 interface BypassTabProps {
   hostId: string;

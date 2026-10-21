@@ -20,7 +20,7 @@ const (
 
 // 包级 var 注入点。
 var (
-	statfs = func(path string, buf *unix.Statfs_t) error { return unix.Statfs(path, buf) }
+	statfs      = func(path string, buf *unix.Statfs_t) error { return unix.Statfs(path, buf) }
 	userHomeDir = os.UserHomeDir
 )
 

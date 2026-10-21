@@ -16,7 +16,7 @@ const (
 	AnsiBlue   = "\033[34m"
 	AnsiCyan   = "\033[36m"
 	AnsiOrange = "\033[38;5;208m" // 256 色极客橙
-	AnsiGray   = "\033[90m"      // [Phase 32 D-23] reconnect "..." / input_buffer 未确认字符
+	AnsiGray   = "\033[90m"       // [Phase 32 D-23] reconnect "..." / input_buffer 未确认字符
 )
 
 // fdHolder 是 ColorEnabled 唯一关心的接口：能拿到 fd 即可探测 TTY。

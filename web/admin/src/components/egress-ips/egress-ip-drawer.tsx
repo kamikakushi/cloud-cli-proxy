@@ -13,7 +13,6 @@ import {
   formValuesToProxyConfig,
   proxyConfigToFormValues,
 } from "./proxy-fields";
-import { normalizeEgressIPAddress } from "@/lib/egress-ip-address";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -178,7 +177,7 @@ export function EgressIPDrawer({
   const createMutation = useCreateEgressIP();
   const updateMutation = useUpdateEgressIP();
 
-  const form = useForm<FormValues>({
+  const form = useForm<z.input<typeof formSchema>, unknown, FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       label: "",
@@ -229,8 +228,6 @@ export function EgressIPDrawer({
 
   function onSubmit(values: FormValues) {
     // 空值表示尚未检测，后端验证阶段会通过 SOCKS5 探测真实出口 IP。
-    const ipAddress = normalizeEgressIPAddress(values.ip_address);
-
     let proxyConfig: Record<string, unknown>;
     if (values.edit_mode === "json") {
       proxyConfig = JSON.parse(values.proxy_config_json!);

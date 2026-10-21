@@ -483,4 +483,3 @@ func (h *AdminUsersHandler) RotatePassword() nethttp.Handler {
 		writeJSON(w, nethttp.StatusOK, map[string]any{"new_password": newPassword})
 	})
 }
-

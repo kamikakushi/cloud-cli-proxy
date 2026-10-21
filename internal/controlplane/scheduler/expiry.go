@@ -83,10 +83,10 @@ func (s *ExpiryScanner) expireUser(ctx context.Context, user repository.User) er
 		}
 
 		s.store.RecordEvent(ctx, repository.RecordEventParams{
-			HostID: &host.ID,
-			UserID: &user.ID,
-			Level:  "info",
-			Type:   "host.stop.expired",
+			HostID:  &host.ID,
+			UserID:  &user.ID,
+			Level:   "info",
+			Type:    "host.stop.expired",
 			Message: fmt.Sprintf("host %s stopped due to user expiry", host.ID),
 			Metadata: map[string]any{
 				"operator": "system",

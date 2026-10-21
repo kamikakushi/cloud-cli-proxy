@@ -76,8 +76,8 @@ const (
 )
 
 type ProbeStreamEvent struct {
-	Stage   ProbeStage  `json:"stage"`
-	Message string      `json:"message"`
+	Stage   ProbeStage   `json:"stage"`
+	Message string       `json:"message"`
 	Result  *ProbeResult `json:"result,omitempty"`
 }
 

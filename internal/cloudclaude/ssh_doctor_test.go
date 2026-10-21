@@ -29,13 +29,13 @@ func TestSSHDoctor(t *testing.T) {
 
 	t.Run("expected_mode", func(t *testing.T) {
 		cases := map[string]string{
-			"private":          "0600",
-			"authorized_keys":  "0600",
-			"known_hosts":      "0600",
-			"config":           "0600",
-			"public":           "0644",
-			"other":            "",
-			"":                 "",
+			"private":         "0600",
+			"authorized_keys": "0600",
+			"known_hosts":     "0600",
+			"config":          "0600",
+			"public":          "0644",
+			"other":           "",
+			"":                "",
 		}
 		for kind, want := range cases {
 			if got := expectedMode(kind); got != want {

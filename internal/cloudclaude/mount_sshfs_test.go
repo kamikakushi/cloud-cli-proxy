@@ -87,8 +87,9 @@ func mustSignerFromKey(t *testing.T) ssh.Signer {
 // server-side Fileread 仅调用 1 次（FUSE page cache 命中第二次不回源）。
 //
 // 测试拓扑：
-//   client(os.ReadFile) → mountpoint → sshfs（本机进程）→ 真实 ssh → fixture SSH server
-//   → sftp.NewRequestServer(handlers={FileGet: counting,...}) → counter.Add(1)
+//
+//	client(os.ReadFile) → mountpoint → sshfs（本机进程）→ 真实 ssh → fixture SSH server
+//	→ sftp.NewRequestServer(handlers={FileGet: counting,...}) → counter.Add(1)
 //
 // sshfs / fusermount(3) 任一未安装时自动 Skip（D-11 / D-20 / D-22）。
 func TestSSHFSCacheHitsKernelPageCache(t *testing.T) {

@@ -96,4 +96,3 @@ func mountSSHFS(conn *ssh.Client, localDir, remotePath string) (cleanup func(), 
 	}
 	return cleanup, nil
 }
-

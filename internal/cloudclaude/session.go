@@ -184,9 +184,9 @@ func buildClaudeCmd(claudeArgs []string, hasProxy bool, remoteCwd string) string
 
 // buildTmuxRemoteCmd 构造 D-10 完整远程命令模板。所有参数已 shellescape。
 //
-//   cd <cwd_q> && command -v tmux >/dev/null 2>&1 \
-//     && exec tmux -u new-session -A -d -s <session_q> <wrap_q> \; attach-session -t <session_q> \
-//     || exec <fallback>
+//	cd <cwd_q> && command -v tmux >/dev/null 2>&1 \
+//	  && exec tmux -u new-session -A -d -s <session_q> <wrap_q> \; attach-session -t <session_q> \
+//	  || exec <fallback>
 //
 // wrapCmd = "export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && cd <cwd_q> && <claudeCmd>"
 // （整体 shellescape 一次后塞给 tmux new-session）。

@@ -8,20 +8,20 @@ import (
 // TestSQLConstants_NonEmpty 确保所有包级 SQL 常量非空。
 func TestSQLConstants_NonEmpty(t *testing.T) {
 	queries := map[string]string{
-		"getHostSQL":                           getHostSQL,
-		"listHostsSQL":                         listHostsSQL,
-		"listHostsByUserIDSQL":                 listHostsByUserIDSQL,
-		"listHostsWithUsernameSQL":             listHostsWithUsernameSQL,
-		"listRunningHostsSQL":                  listRunningHostsSQL,
-		"listRunningHostsByUserIDSQL":          listRunningHostsByUserIDSQL,
-		"getHostByUsernameSQL":                 getHostByUsernameSQL,
-		"getHostWithClaudeAccountSQL":          getHostWithClaudeAccountSQL,
-		"resolveClaudeAccountByHostSQL":        resolveClaudeAccountByHostSQL,
-		"resolveClaudeAccountByUserFallbackSQL": resolveClaudeAccountByUserFallbackSQL,
-		"checkClaudeAccountPersistentVolumeNameSQL": checkClaudeAccountPersistentVolumeNameSQL,
+		"getHostSQL":                                 getHostSQL,
+		"listHostsSQL":                               listHostsSQL,
+		"listHostsByUserIDSQL":                       listHostsByUserIDSQL,
+		"listHostsWithUsernameSQL":                   listHostsWithUsernameSQL,
+		"listRunningHostsSQL":                        listRunningHostsSQL,
+		"listRunningHostsByUserIDSQL":                listRunningHostsByUserIDSQL,
+		"getHostByUsernameSQL":                       getHostByUsernameSQL,
+		"getHostWithClaudeAccountSQL":                getHostWithClaudeAccountSQL,
+		"resolveClaudeAccountByHostSQL":              resolveClaudeAccountByHostSQL,
+		"resolveClaudeAccountByUserFallbackSQL":      resolveClaudeAccountByUserFallbackSQL,
+		"checkClaudeAccountPersistentVolumeNameSQL":  checkClaudeAccountPersistentVolumeNameSQL,
 		"upsertClaudeAccountPersistentVolumeNameSQL": upsertClaudeAccountPersistentVolumeNameSQL,
-		"lockClaudeAccountForDeleteSQL":        lockClaudeAccountForDeleteSQL,
-		"deleteClaudeAccountSQL":               deleteClaudeAccountSQL,
+		"lockClaudeAccountForDeleteSQL":              lockClaudeAccountForDeleteSQL,
+		"deleteClaudeAccountSQL":                     deleteClaudeAccountSQL,
 	}
 	for name, q := range queries {
 		if strings.TrimSpace(q) == "" {
@@ -133,11 +133,11 @@ func TestClaudeAccountQueries_Shape(t *testing.T) {
 
 // sqlConstants maps test names to actual SQL constants for contract tests.
 var sqlConstants = map[string]string{
-	"resolveClaudeAccountByHostSQL":        resolveClaudeAccountByHostSQL,
-	"resolveClaudeAccountByUserFallbackSQL": resolveClaudeAccountByUserFallbackSQL,
+	"resolveClaudeAccountByHostSQL":             resolveClaudeAccountByHostSQL,
+	"resolveClaudeAccountByUserFallbackSQL":     resolveClaudeAccountByUserFallbackSQL,
 	"checkClaudeAccountPersistentVolumeNameSQL": checkClaudeAccountPersistentVolumeNameSQL,
-	"lockClaudeAccountForDeleteSQL":        lockClaudeAccountForDeleteSQL,
-	"deleteClaudeAccountSQL":               deleteClaudeAccountSQL,
+	"lockClaudeAccountForDeleteSQL":             lockClaudeAccountForDeleteSQL,
+	"deleteClaudeAccountSQL":                    deleteClaudeAccountSQL,
 }
 
 // TestGetHostSQL_NoLeakOfSensitiveFields 验证敏感字段不出现在默认查询中。

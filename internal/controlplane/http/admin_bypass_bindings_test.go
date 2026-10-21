@@ -19,12 +19,12 @@ import (
 type stubBypassBindingStore struct {
 	mu sync.Mutex
 
-	bindings  []repository.BypassBinding
-	listErr   error
-	createOut repository.BypassBinding
-	createErr error
-	createSeen []repository.CreateBypassBindingParams
-	deleteErr error
+	bindings    []repository.BypassBinding
+	listErr     error
+	createOut   repository.BypassBinding
+	createErr   error
+	createSeen  []repository.CreateBypassBindingParams
+	deleteErr   error
 	deleteCount int
 
 	auditLogs []repository.InsertBypassAuditLogParams

@@ -11,10 +11,10 @@
 //   - 锁路径 /tmp/cloud-claude/locks/sync-<accountID>.lock
 //     （ubuntu:24.04 系统级 lock 目录默认 root-only，UID 1000 mkdir EACCES — 见 RESEARCH §6.2）
 //   - 远程命令 `flock -n -E 99 -F <path> -c 'echo $$; exec sleep infinity' & echo $!`
-//     - -n: 非阻塞拿锁；拿不到立即退；
-//     - -E 99: 自定义 lock 被占退出码（与 flock 默认 1 区分系统错误）；
-//     - -F: no-fork，让 sleep infinity 直接持有 fd，SSH 关闭时收割 sleep
-//       即等价收割 lock；缺 -F → flock 父进程仍持锁，SSH 断后锁不释放（RESEARCH §6.1）。
+//   - -n: 非阻塞拿锁；拿不到立即退；
+//   - -E 99: 自定义 lock 被占退出码（与 flock 默认 1 区分系统错误）；
+//   - -F: no-fork，让 sleep infinity 直接持有 fd，SSH 关闭时收割 sleep
+//     即等价收割 lock；缺 -F → flock 父进程仍持锁，SSH 断后锁不释放（RESEARCH §6.1）。
 //   - accountID == "" → 返回 noop release（D-19 anon 路径不上锁）。
 package cloudclaude
 

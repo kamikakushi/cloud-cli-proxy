@@ -73,9 +73,9 @@ func TestWorkerExecute_NoPanic_BehaviorUnchanged(t *testing.T) {
 
 	// 使用一个不存在的 action，走 default 分支返回 error
 	req := agentapi.HostActionRequest{
-		TaskID:   "t-no-panic",
-		HostID:   "h-no-panic",
-		Action:   agentapi.HostAction("nonexistent_action"),
+		TaskID:    "t-no-panic",
+		HostID:    "h-no-panic",
+		Action:    agentapi.HostAction("nonexistent_action"),
 		ImageName: "img:test",
 	}
 

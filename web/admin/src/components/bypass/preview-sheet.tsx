@@ -35,7 +35,6 @@ export function PreviewSheet({
   hostId,
   open,
   onOpenChange,
-  onApply,
 }: PreviewSheetProps) {
   const previewMutation = usePreviewBypass(hostId);
 

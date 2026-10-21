@@ -100,4 +100,3 @@ func (h *UserPasswordHandler) ChangePassword() nethttp.Handler {
 		writeJSON(w, nethttp.StatusOK, map[string]string{"status": "ok"})
 	})
 }
-

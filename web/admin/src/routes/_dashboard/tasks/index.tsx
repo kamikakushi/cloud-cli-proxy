@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ListTodo, Search } from "lucide-react";
+import { ListTodo } from "lucide-react";
 import { useTasks } from "@/hooks/use-tasks";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
 import { DataTableShell } from "@/components/layout/data-table-shell";
 import { EmptyState } from "@/components/layout/empty-state";

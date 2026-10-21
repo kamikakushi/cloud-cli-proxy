@@ -23,15 +23,15 @@ import (
 	"github.com/zanel1u/cloud-cli-proxy/internal/runtime"
 	runtimetasks "github.com/zanel1u/cloud-cli-proxy/internal/runtime/tasks"
 	"github.com/zanel1u/cloud-cli-proxy/internal/sshproxy"
-	"github.com/zanel1u/cloud-cli-proxy/internal/store/migrator"
 	"github.com/zanel1u/cloud-cli-proxy/internal/store/migrations"
+	"github.com/zanel1u/cloud-cli-proxy/internal/store/migrator"
 	"github.com/zanel1u/cloud-cli-proxy/internal/store/repository"
 )
 
 type Config struct {
 	Addr               string
 	DatabaseURL        string
-	AdminUsername       string
+	AdminUsername      string
 	AdminPassword      string
 	AdminJWTSecret     string
 	ExpiryScanInterval time.Duration
@@ -151,20 +151,20 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 	}
 
 	router := cphttp.NewRouter(cphttp.Dependencies{
-		Logger:         logger,
-		Health:         repo,
-		AgentHealth:    agentHealth,
-		Users:          repo,
-		Hosts:          repo,
-		HostActions:    runtimeService,
-		Tasks:          repo,
-		TasksHandler:   cphttp.NewTasksHandler(cphttp.TasksHandlerDependencies{Logger: logger, Tasks: repo}),
-		Admin:          adminCfg,
-		AuthStore:      repo,
-		DashboardStats: repo,
-		AdminUsers:     repo,
-		AdminEgressIPs: repo,
-		AdminBindings:  repo,
+		Logger:              logger,
+		Health:              repo,
+		AgentHealth:         agentHealth,
+		Users:               repo,
+		Hosts:               repo,
+		HostActions:         runtimeService,
+		Tasks:               repo,
+		TasksHandler:        cphttp.NewTasksHandler(cphttp.TasksHandlerDependencies{Logger: logger, Tasks: repo}),
+		Admin:               adminCfg,
+		AuthStore:           repo,
+		DashboardStats:      repo,
+		AdminUsers:          repo,
+		AdminEgressIPs:      repo,
+		AdminBindings:       repo,
 		AdminBypassPresets:  repo,
 		AdminBypassRules:    repo,
 		AdminBypassBindings: repo,
@@ -177,13 +177,13 @@ func New(ctx context.Context, cfg Config) (*App, error) {
 		AgentClient:         agentRunner,
 		AdminEvents:         repo,
 		EventRecorder:       repo,
-		EntryStore:     repo,
-		EntryBaseURL:   "",
-		ImageLockPath:  runtime.DefaultImageLockPath,
-		UserHosts:      repo,
-		SSHKeys:        repo,
-		ImageCache:     imageCache,
-		AdminUIHandler: cfg.AdminUIHandler,
+		EntryStore:          repo,
+		EntryBaseURL:        "",
+		ImageLockPath:       runtime.DefaultImageLockPath,
+		UserHosts:           repo,
+		SSHKeys:             repo,
+		ImageCache:          imageCache,
+		AdminUIHandler:      cfg.AdminUIHandler,
 	})
 
 	var sshProxySrv *sshproxy.Server
@@ -274,7 +274,6 @@ func (a *App) Run(ctx context.Context) error {
 
 	cphttp.CleanupOrphanProbes(a.logger)
 
-
 	if a.sshProxy != nil {
 		go func() {
 			if err := a.sshProxy.ListenAndServe(ctx); err != nil {
@@ -319,7 +318,6 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 }
-
 
 // dockerInspector 在 embedded 模式下直接调用 docker container inspect，
 // 替代通过 host-agent socket 通信的 agentapi.Client。

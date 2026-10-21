@@ -22,11 +22,11 @@ const (
 
 // LocalOptions configures local container behavior.
 type LocalOptions struct {
-	ProjectDir    string // Current project directory (for container name hash and workspace mount)
-	Port          int    // 0 = auto-assign
-	EgressConfig  string // --egress-config file path, empty = disabled
-	ImageName     string // Default from image.lock or built-in default
-	MemoryLimitMB int    // Default 4096
+	ProjectDir    string  // Current project directory (for container name hash and workspace mount)
+	Port          int     // 0 = auto-assign
+	EgressConfig  string  // --egress-config file path, empty = disabled
+	ImageName     string  // Default from image.lock or built-in default
+	MemoryLimitMB int     // Default 4096
 	CPULimit      float64 // Default 2.0
 }
 

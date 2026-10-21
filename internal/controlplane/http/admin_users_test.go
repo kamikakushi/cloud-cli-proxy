@@ -11,25 +11,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"database/sql"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/zanel1u/cloud-cli-proxy/internal/store/repository"
 )
 
 type stubUserStore struct {
-	users         []repository.User
-	user          repository.User
-	hosts         []repository.Host
-	err           error
-	deleteErr     error
-	updatePwdErr  error
-	createErr     error
-	statusErr     error
-	expiryErr     error
-	expiryUser    repository.User
-	statusUser    repository.User
-	createUser    repository.User
+	users        []repository.User
+	user         repository.User
+	hosts        []repository.Host
+	err          error
+	deleteErr    error
+	updatePwdErr error
+	createErr    error
+	statusErr    error
+	expiryErr    error
+	expiryUser   repository.User
+	statusUser   repository.User
+	createUser   repository.User
 }
 
 func (s *stubUserStore) ListUsers(_ context.Context) ([]repository.User, error) {

@@ -47,9 +47,9 @@ func TestEmbeddedDispatcher_NormalPath_Unchanged(t *testing.T) {
 
 	// 使用一个不存在的 action，走 default 分支返回 error
 	req := agentapi.HostActionRequest{
-		TaskID:   "t-normal",
-		HostID:   "h-normal",
-		Action:   agentapi.HostAction("nonexistent_action"),
+		TaskID:    "t-normal",
+		HostID:    "h-normal",
+		Action:    agentapi.HostAction("nonexistent_action"),
 		ImageName: "img:test",
 	}
 

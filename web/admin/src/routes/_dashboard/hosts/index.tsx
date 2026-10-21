@@ -80,8 +80,8 @@ const taskKindLabels: Record<string, string> = {
 };
 
 function getHostStatus(
-  host: (typeof useHosts extends (...args: any[]) => { data: infer D } | undefined ? D : never)["hosts"][number],
-  latestTask?: ReturnType<typeof useTasks>["data"]["tasks"][number],
+  host: NonNullable<ReturnType<typeof useHosts>["data"]>["hosts"][number],
+  latestTask?: NonNullable<ReturnType<typeof useTasks>["data"]>["tasks"][number],
 ) {
   // 优先显示进行中的任务
   if (latestTask && (latestTask.status === "pending" || latestTask.status === "running")) {

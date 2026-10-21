@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Home,
   FolderOpen,
-  Loader2,
   AlertCircle,
 } from "lucide-react";
 import { useHostFiles } from "@/hooks/use-host-files";

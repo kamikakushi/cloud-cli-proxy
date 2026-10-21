@@ -23,10 +23,10 @@ import (
 // BeginTx 返回真正的 *sql.Tx，handler 会把 tx 传给 repository.LockClaudeAccountForDelete
 // 与 repository.DeleteClaudeAccountTx——这两个函数现在直接操作 *sql.Tx。
 type sqliteAccountStore struct {
-	db        *sql.DB
-	beginErr  error
-	beginCnt  int
-	beginCtx  context.Context
+	db       *sql.DB
+	beginErr error
+	beginCnt int
+	beginCtx context.Context
 }
 
 func (s *sqliteAccountStore) BeginTx(ctx context.Context) (*sql.Tx, error) {

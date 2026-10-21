@@ -86,14 +86,14 @@ func (e *hotSyncErr) Reason() string      { return e.reason }
 //   - 连续 3 次无变更 → interval *= idleBackoffFactor（最高 maxHotSyncInterval）
 //   - 避免固定 1s 轮询在大型仓库下浪费 CPU / 网络
 type HotSyncEngine struct {
-	connA     *ssh.Client
-	connB     *ssh.Client
-	client    *sftp.Client
-	localDir  string
-	remoteDir string
-	logger    io.Writer
-	interval  time.Duration
-	matcher   *IgnoreMatcher
+	connA       *ssh.Client
+	connB       *ssh.Client
+	client      *sftp.Client
+	localDir    string
+	remoteDir   string
+	logger      io.Writer
+	interval    time.Duration
+	matcher     *IgnoreMatcher
 	resetRemote bool
 
 	stopCh chan struct{}

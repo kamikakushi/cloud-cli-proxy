@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	vscodeServerDiskWarnMB = 500
+	vscodeServerDiskWarnMB  = 500
 	vscodeServerDiskBloatMB = 2048
 )
 
@@ -86,7 +86,7 @@ func checkVSCodeServerDisk(ctx context.Context, runner RemoteRunner) Check {
 	case mb >= vscodeServerDiskBloatMB:
 		c := newFail("remote-ssh", "vscode_server_disk", errcodes.DISK_VSCODE_SERVER_BLOAT, mb)
 		c.Details = map[string]any{
-			"size_mb": mb,
+			"size_mb":        mb,
 			"cleanup_light":  "rm -rf ~/.vscode-server/extensions-cache/ （仅缓存）",
 			"cleanup_medium": "rm -rf ~/.vscode-server/*/extensions/*/ （所有扩展，保留配置）",
 			"cleanup_full":   "rm -rf ~/.vscode-server/ （完全清理，VS Code 重连时会重建）",
@@ -95,7 +95,7 @@ func checkVSCodeServerDisk(ctx context.Context, runner RemoteRunner) Check {
 	case mb >= vscodeServerDiskWarnMB:
 		c := newWarn("remote-ssh", "vscode_server_disk", errcodes.DISK_VSCODE_SERVER_WARN, mb)
 		c.Details = map[string]any{
-			"size_mb": mb,
+			"size_mb":        mb,
 			"cleanup_light":  "rm -rf ~/.vscode-server/extensions-cache/ （仅缓存）",
 			"cleanup_medium": "rm -rf ~/.vscode-server/*/extensions/*/ （所有扩展，保留配置）",
 		}

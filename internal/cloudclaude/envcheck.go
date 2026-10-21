@@ -131,4 +131,3 @@ func section(title string) {
 func row(label, value string) {
 	fmt.Printf("  %-16s %s\n", label, value)
 }
-
