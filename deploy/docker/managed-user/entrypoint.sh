@@ -169,6 +169,32 @@ prepare_container_disguise() {
     case "$v1" in ''|*[!0-9]*) ;; 9223372036854771712) ;; *) mem_bytes="$v1" ;; esac
   fi
 
+  # CPU 核数按 cgroup 配额联动：os.cpus()/availableParallelism 伪装成
+  # 配额核数（向上取整，与真实调度行为一致），未限额时不注入（spoof 缺省 4）。
+  local cpu_cores=""
+  if [ -r /sys/fs/cgroup/cpu.max ]; then
+    # cgroup v2: "<quota> <period>"，quota 为 max 表示未限额
+    local quota period
+    read -r quota period <<<"$(cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo 'max 100000')"
+    if [ "$quota" != "max" ] && [ "$period" -gt 0 ] 2>/dev/null; then
+      cpu_cores=$(( (quota + period - 1) / period ))
+    fi
+  fi
+  if [ -z "$cpu_cores" ] && [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then
+    # cgroup v1: quota 为 0/-1 表示未限额
+    local q p
+    q="$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null || echo -1)"
+    p="$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us 2>/dev/null || echo 100000)"
+    if [ "$q" -gt 0 ] && [ "$p" -gt 0 ] 2>/dev/null; then
+      cpu_cores=$(( (q + p - 1) / p ))
+    fi
+  fi
+  case "$cpu_cores" in ''|0|1) cpu_cores="";; esac
+
+  # CPU 型号可经 DISGUISE_CPU_MODEL 配置（如按出口 IP 地区选当地云常见机型），
+  # 未设置时 spoof 模块使用缺省（AMD EPYC 7763）。
+  local cpu_model="${DISGUISE_CPU_MODEL:-}"
+
   # 删除容器检测标志
   rm -f /.dockerenv
 
@@ -192,6 +218,8 @@ SPOOF_TIMEZONE=${tz}
 BUN_OPTIONS=--preload /usr/local/lib/cloud-cli-proxy/spoof-fingerprint.js
 BROWSER=/usr/local/bin/cc-browser-open
 ${mem_bytes:+SPOOF_TOTAL_MEM=${mem_bytes}}
+${cpu_cores:+SPOOF_CPU_CORES=${cpu_cores}}
+${cpu_model:+SPOOF_CPU_MODEL=${cpu_model}}
 ENVTELEM
 
   # UsePAM=no 时 /etc/environment 不进 login shell，SPOOF_* 需经 profile.d 传递。
@@ -203,10 +231,16 @@ ENVTELEM
     if [ -n "$mem_bytes" ]; then
       echo "export SPOOF_TOTAL_MEM=${mem_bytes}"
     fi
+    if [ -n "$cpu_cores" ]; then
+      echo "export SPOOF_CPU_CORES=${cpu_cores}"
+    fi
+    if [ -n "$cpu_model" ]; then
+      echo "export SPOOF_CPU_MODEL=\"${cpu_model}\""
+    fi
   } > /etc/profile.d/zz-disguise.sh
   chmod 0644 /etc/profile.d/zz-disguise.sh
 
-  echo "[entrypoint] container disguise: machine-id=${mid:0:8}…(persistent) /.dockerenv removed TZ=${tz} mem=${mem_bytes:-default8G} telemetry blocked"
+  echo "[entrypoint] container disguise: machine-id=${mid:0:8}…(persistent) /.dockerenv removed TZ=${tz} mem=${mem_bytes:-default8G} cpus=${cpu_cores:-default4} cpu_model=${cpu_model:-default} telemetry blocked"
 
   # 导出到 entrypoint（PID 1）进程环境：sshd 会话与 VNC 桌面终端均为其
   # 子进程，统一继承；覆盖非 login shell 不读 /etc/environment 的场景。
@@ -219,6 +253,12 @@ ENVTELEM
   export BROWSER=/usr/local/bin/cc-browser-open
   if [ -n "$mem_bytes" ]; then
     export SPOOF_TOTAL_MEM="${mem_bytes}"
+  fi
+  if [ -n "$cpu_cores" ]; then
+    export SPOOF_CPU_CORES="${cpu_cores}"
+  fi
+  if [ -n "$cpu_model" ]; then
+    export SPOOF_CPU_MODEL="${cpu_model}"
   fi
 }
 
