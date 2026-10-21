@@ -277,6 +277,7 @@ func NewRouter(deps Dependencies) nethttp.Handler {
 			mux.Handle("DELETE /v1/admin/hosts/{hostID}", adminGuard(hostsHandler.Delete()))
 			mux.Handle("PUT /v1/admin/hosts/{hostID}/mounts", adminGuard(hostsHandler.UpdateMounts()))
 			mux.Handle("PATCH /v1/admin/hosts/{hostID}/resources", adminGuard(hostsHandler.PatchResources()))
+			mux.Handle("PUT /v1/admin/hosts/{hostID}/disguise-cpu-model", adminGuard(hostsHandler.UpdateDisguiseCPUModel()))
 
 			vncProxy := NewAdminVNCProxyHandler(deps.Logger, deps.AdminHosts)
 			// VNC 入口页 (vnc.html) 带 ?token= 认证；子资源（CSS/JS/图片）
@@ -286,6 +287,7 @@ func NewRouter(deps Dependencies) nethttp.Handler {
 
 		if deps.AdminClaudeAccounts != nil {
 			claudeHandler := NewAdminClaudeAccountsHandler(deps.Logger, deps.AdminClaudeAccounts, deps.AgentClient, deps.EventRecorder)
+			mux.Handle("POST /v1/admin/claude-accounts", adminGuard(claudeHandler.Create()))
 			mux.Handle("DELETE /v1/admin/claude-accounts/{accountID}", adminGuard(claudeHandler.Delete()))
 			mux.Handle("PUT /v1/admin/claude-accounts/{accountID}/api-token", adminGuard(claudeHandler.SetAPIToken()))
 		}

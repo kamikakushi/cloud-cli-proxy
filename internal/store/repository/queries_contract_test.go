@@ -46,6 +46,7 @@ func TestHostQueries_IncludeRequiredColumns(t *testing.T) {
 		"id", "user_id", "status", "short_id",
 		"template_image_ref",
 		"home_volume_name", "slot_key", "timezone", "hostname",
+		"disguise_cpu_model", // migration 0006
 	}
 
 	for name, q := range hostReadQueries {

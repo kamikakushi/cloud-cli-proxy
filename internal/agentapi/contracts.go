@@ -54,15 +54,19 @@ type HostActionRequest struct {
 	Labels        map[string]string `json:"labels"`
 	Timezone      string            `json:"timezone"`
 	Hostname      string            `json:"hostname"`
-	MemoryLimitMB int               `json:"memory_limit_mb,omitempty"`
-	CPULimit      float64           `json:"cpu_limit,omitempty"`
-	PidsLimit     *int              `json:"pids_limit,omitempty"`
-	Username      string            `json:"username,omitempty"`
-	EntryPassword string            `json:"entry_password,omitempty"`
-	SSHPublicKey  string            `json:"ssh_public_key,omitempty"`
-	SSHPrivateKey string            `json:"ssh_private_key,omitempty"`
-	SSHKeys       []SSHKeyEntry     `json:"ssh_keys,omitempty"`
-	Volumes       []VolumeMount     `json:"volumes,omitempty"`
+	// DisguiseCPUModel 来自 hosts.disguise_cpu_model（migration 0006）。
+	// worker 在非空时注入容器环境变量 DISGUISE_CPU_MODEL，容器 entrypoint
+	// prepare_container_disguise 据此伪装 CPU 型号；空串回落镜像默认（AMD EPYC 7763）。
+	DisguiseCPUModel string        `json:"disguise_cpu_model,omitempty"`
+	MemoryLimitMB    int           `json:"memory_limit_mb,omitempty"`
+	CPULimit         float64       `json:"cpu_limit,omitempty"`
+	PidsLimit        *int          `json:"pids_limit,omitempty"`
+	Username         string        `json:"username,omitempty"`
+	EntryPassword    string        `json:"entry_password,omitempty"`
+	SSHPublicKey     string        `json:"ssh_public_key,omitempty"`
+	SSHPrivateKey    string        `json:"ssh_private_key,omitempty"`
+	SSHKeys          []SSHKeyEntry `json:"ssh_keys,omitempty"`
+	Volumes          []VolumeMount `json:"volumes,omitempty"`
 	// ClaudeAccountID 携带 Phase 30 D-09 规定的账号维度标识，供 Phase 33 worker
 	// 组装 `claude-state-{claude_account_id}` volume 与容器 label 使用。
 	// `omitempty` 是契约：空串表示"本次 action 无账号维度"，禁止写入空字符串来表达"已分配但未知"。

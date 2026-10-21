@@ -32,15 +32,18 @@ type User struct {
 }
 
 type Host struct {
-	ID               string     `json:"id"`
-	UserID           string     `json:"user_id"`
-	Status           string     `json:"status"`
-	ShortID          string     `json:"short_id"`
-	TemplateImageRef string     `json:"template_image_ref"`
-	HomeVolumeName   string     `json:"home_volume_name"`
-	SlotKey          string     `json:"slot_key"`
-	Timezone         string     `json:"timezone"`
-	Hostname         string     `json:"hostname"`
+	ID               string `json:"id"`
+	UserID           string `json:"user_id"`
+	Status           string `json:"status"`
+	ShortID          string `json:"short_id"`
+	TemplateImageRef string `json:"template_image_ref"`
+	HomeVolumeName   string `json:"home_volume_name"`
+	SlotKey          string `json:"slot_key"`
+	Timezone         string `json:"timezone"`
+	Hostname         string `json:"hostname"`
+	// DisguiseCPUModel 对应 hosts.disguise_cpu_model（migration 0006）。
+	// 空串 = 未配置，容器回落镜像默认伪装 CPU 型号（AMD EPYC 7763）。
+	DisguiseCPUModel string     `json:"disguise_cpu_model"`
 	MemoryLimitMB    *int       `json:"memory_limit_mb"`
 	CPULimit         *float64   `json:"cpu_limit"`
 	PidsLimit        *int       `json:"pids_limit"`
@@ -243,6 +246,16 @@ type ClaudeAccount struct {
 	Status               string    `json:"status"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// CreateClaudeAccountParams 创建 claude_account 的入参。
+// HostID 可空：账号创建时通常尚未绑定宿主机；persistent_volume_name
+// 由后续流程分配（Phase 30 D-01/D-02），不在创建时指定。
+type CreateClaudeAccountParams struct {
+	UserID      string
+	Email       string
+	DisplayName string
+	HostID      *string
 }
 
 type SSHKey struct {

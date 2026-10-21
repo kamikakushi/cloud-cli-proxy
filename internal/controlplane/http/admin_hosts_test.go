@@ -38,6 +38,8 @@ type stubHostStore struct {
 	updatedMemoryMB  *int
 	updatedCPU       *float64
 	updatedPids      *int
+
+	updatedDisguiseCPUModel string
 }
 
 func (s *stubHostStore) ListHostsWithUsername(_ context.Context) ([]repository.HostWithUsername, error) {
@@ -103,6 +105,11 @@ func (s *stubHostStore) UpdateHostResources(_ context.Context, _ string, memoryL
 	s.updatedMemoryMB = memoryLimitMB
 	s.updatedCPU = cpuLimit
 	s.updatedPids = pidsLimit
+	return nil
+}
+
+func (s *stubHostStore) UpdateHostDisguiseCPUModel(_ context.Context, _ string, model string) error {
+	s.updatedDisguiseCPUModel = model
 	return nil
 }
 
@@ -643,4 +650,77 @@ func TestDockerResourceMemoryArgsSetSwapWithMemory(t *testing.T) {
 	if got := strings.Join(dockerResourceMemoryArgs(8192), " "); got != "--memory 8192m --memory-swap 8192m" {
 		t.Fatalf("custom memory args = %q", got)
 	}
+}
+
+// TestAdminHosts_UpdateDisguiseCPUModel 锁定 migration 0006 的 admin 入口：
+// PUT /v1/admin/hosts/{hostID}/disguise-cpu-model {model:"..."}。
+// 空串 = 清除（回落镜像默认 AMD EPYC）；host 不存在 = 404。
+func TestAdminHosts_UpdateDisguiseCPUModel(t *testing.T) {
+	const model = "Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz"
+
+	doPut := func(t *testing.T, store *stubHostStore, body string) (*nethttp.Response, map[string]any) {
+		t.Helper()
+		router := adminTestRouter(t, Dependencies{
+			Logger:        slog.Default(),
+			AdminHosts:    store,
+			HostActions:   &stubQueuer{},
+			EventRecorder: &stubEventRecorder{},
+		})
+		srv := httptest.NewServer(router)
+		defer srv.Close()
+
+		req, _ := nethttp.NewRequest("PUT", srv.URL+"/v1/admin/hosts/h1/disguise-cpu-model", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+validAdminToken(t))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := nethttp.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+		var respBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&respBody)
+		return resp, respBody
+	}
+
+	t.Run("set_model_200", func(t *testing.T) {
+		store := &stubHostStore{host: repository.Host{ID: "h1", Status: "running"}}
+		resp, body := doPut(t, store, `{"model":"`+model+`"}`)
+		if resp.StatusCode != nethttp.StatusOK {
+			t.Fatalf("status=%d, body=%v", resp.StatusCode, body)
+		}
+		if store.updatedDisguiseCPUModel != model {
+			t.Fatalf("updatedDisguiseCPUModel=%q, want %q", store.updatedDisguiseCPUModel, model)
+		}
+		if got, _ := body["disguise_cpu_model"].(string); got != model {
+			t.Fatalf("response disguise_cpu_model=%q, want %q", got, model)
+		}
+	})
+
+	t.Run("empty_model_clears", func(t *testing.T) {
+		store := &stubHostStore{host: repository.Host{ID: "h1", Status: "running"}}
+		resp, body := doPut(t, store, `{"model":""}`)
+		if resp.StatusCode != nethttp.StatusOK {
+			t.Fatalf("status=%d, body=%v", resp.StatusCode, body)
+		}
+		if store.updatedDisguiseCPUModel != "" {
+			t.Fatalf("空串应清除，实际 %q", store.updatedDisguiseCPUModel)
+		}
+	})
+
+	t.Run("host_not_found_404", func(t *testing.T) {
+		store := &stubHostStore{hostErr: sql.ErrNoRows}
+		resp, body := doPut(t, store, `{"model":"AMD EPYC 7763"}`)
+		if resp.StatusCode != nethttp.StatusNotFound {
+			t.Fatalf("status=%d, body=%v", resp.StatusCode, body)
+		}
+	})
+
+	t.Run("invalid_body_400", func(t *testing.T) {
+		store := &stubHostStore{host: repository.Host{ID: "h1", Status: "running"}}
+		resp, body := doPut(t, store, `not-json`)
+		if resp.StatusCode != nethttp.StatusBadRequest {
+			t.Fatalf("status=%d, body=%v", resp.StatusCode, body)
+		}
+	})
 }

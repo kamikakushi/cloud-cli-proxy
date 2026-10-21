@@ -41,6 +41,7 @@ type AdminHostStore interface {
 	GetHostWithClaudeAccount(ctx context.Context, hostID string) (repository.HostWithClaudeAccount, error) // Phase 33 D-22
 	UpdateHostMounts(ctx context.Context, hostID string, mounts repository.HostMounts) error
 	UpdateHostResources(ctx context.Context, hostID string, memoryLimitMB *int, cpuLimit *float64, pidsLimit *int) error
+	UpdateHostDisguiseCPUModel(ctx context.Context, hostID string, model string) error // migration 0006
 }
 
 type AdminHostsHandler struct {
@@ -1172,6 +1173,62 @@ func (h *AdminHostsHandler) UpdateMounts() nethttp.Handler {
 			}
 		}
 		writeJSON(w, nethttp.StatusOK, map[string]string{"status": "ok"})
+	})
+}
+
+// UpdateDisguiseCPUModel 处理 PUT /v1/admin/hosts/{hostID}/disguise-cpu-model。
+// body 为 {"model": "..."}；空串 = 清除伪装配置，容器回落镜像默认（AMD EPYC 7763）。
+// 更新只落库；对运行中容器的生效依赖下一次 rebuild/create_host 重建。
+func (h *AdminHostsHandler) UpdateDisguiseCPUModel() nethttp.Handler {
+	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		hostID := r.PathValue("hostID")
+
+		var body struct {
+			Model string `json:"model"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "invalid request body"})
+			return
+		}
+		model := strings.TrimSpace(body.Model)
+
+		if _, err := h.store.GetHost(r.Context(), hostID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeJSON(w, nethttp.StatusNotFound, map[string]string{"error": "host not found"})
+				return
+			}
+			h.logger.Error("get host for disguise cpu model update failed", "host_id", hostID, "error", err)
+			writeJSON(w, nethttp.StatusInternalServerError, map[string]string{"error": "get host failed"})
+			return
+		}
+
+		if err := h.store.UpdateHostDisguiseCPUModel(r.Context(), hostID, model); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeJSON(w, nethttp.StatusNotFound, map[string]string{"error": "host not found"})
+				return
+			}
+			h.logger.Error("update host disguise cpu model failed", "host_id", hostID, "error", err)
+			writeJSON(w, nethttp.StatusInternalServerError, map[string]string{"error": "update disguise cpu model failed"})
+			return
+		}
+
+		if h.events != nil {
+			hid := hostID
+			if _, err := h.events.RecordEvent(r.Context(), repository.RecordEventParams{
+				HostID:  &hid,
+				Level:   "info",
+				Type:    "admin.host.disguise_cpu_model_updated",
+				Message: "管理员更新主机伪装 CPU 型号",
+				Metadata: map[string]any{
+					"operator": "admin",
+					"cleared":  model == "",
+				},
+			}); err != nil {
+				h.logger.Error("record event failed", "type", "admin.host.disguise_cpu_model_updated", "error", err)
+			}
+		}
+
+		writeJSON(w, nethttp.StatusOK, map[string]any{"status": "ok", "disguise_cpu_model": model})
 	})
 }
 

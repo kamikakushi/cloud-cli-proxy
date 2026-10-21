@@ -317,6 +317,13 @@ func (w *Worker) buildCreateArgs(request agentapi.HostActionRequest, containerNa
 		"-v", fmt.Sprintf("%s:%s", homeDir, firstNonEmpty(request.HomeMount, defaultWorkspaceMount)),
 	)
 
+	// hosts.disguise_cpu_model（migration 0006）：非空时注入 DISGUISE_CPU_MODEL，
+	// 容器 entrypoint prepare_container_disguise 据此透传 SPOOF_CPU_MODEL；
+	// 空串不注入，容器内 spoof 模块回落镜像默认（AMD EPYC 7763）。
+	if request.DisguiseCPUModel != "" {
+		args = append(args, "-e", "DISGUISE_CPU_MODEL="+request.DisguiseCPUModel)
+	}
+
 	// claude_accounts.api_token（migration 0005）：sk-ant-api* 前缀注入
 	// ANTHROPIC_API_KEY（官方 key 计费）；其余视为网关 Bearer token 注入
 	// ANTHROPIC_AUTH_TOKEN。配了 base_url 时一并注入 ANTHROPIC_BASE_URL。

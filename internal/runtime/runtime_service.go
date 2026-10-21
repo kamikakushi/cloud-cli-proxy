@@ -197,6 +197,7 @@ func (s *Service) QueueHostAction(ctx context.Context, hostID string, action age
 		},
 		Timezone:         host.Timezone,
 		Hostname:         host.Hostname,
+		DisguiseCPUModel: host.DisguiseCPUModel,
 		MemoryLimitMB:    ptrToInt(host.MemoryLimitMB),
 		CPULimit:         ptrToFloat(host.CPULimit),
 		PidsLimit:        host.PidsLimit,

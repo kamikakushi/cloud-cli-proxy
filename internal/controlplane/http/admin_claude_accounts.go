@@ -18,6 +18,9 @@ import (
 // AdminClaudeAccountStore 暴露 Plan 02 仅需的最小集（与 AdminHostStore 风格一致）。
 type AdminClaudeAccountStore interface {
 	BeginTx(ctx context.Context) (*sql.Tx, error)
+	// CreateClaudeAccount 新建 claude_account；id 由 store 层生成（uuid v4），
+	// email 撞 UNIQUE 约束时返回 SQLite 原始错误（handler 转 409）。
+	CreateClaudeAccount(ctx context.Context, params repository.CreateClaudeAccountParams) (repository.ClaudeAccount, error)
 	// UpdateClaudeAccountAPIToken 设置账号的容器侧 API 凭据（migration 0005）。
 	UpdateClaudeAccountAPIToken(ctx context.Context, accountID, token, baseURL string) error
 }
@@ -65,6 +68,84 @@ type setAPITokenRequest struct {
 	APIBaseURL string `json:"api_base_url"`
 }
 
+type createClaudeAccountRequest struct {
+	// UserID 必填：账号归属的 users.id。
+	UserID string `json:"user_id"`
+	// Email 必填且需含 @：全表 UNIQUE，冲突返回 409。
+	Email string `json:"email"`
+	// DisplayName 可选展示名。
+	DisplayName string `json:"display_name"`
+	// HostID 可选：创建时直接绑定宿主机；为空表示稍后绑定。
+	HostID *string `json:"host_id"`
+}
+
+// Create 新建 claude_account（补齐上游 Phase 33 缺失的创建入口）。
+// POST /v1/admin/claude-accounts {user_id, email, display_name?, host_id?}
+// 成功 201 返回新账号；email 重复 409；user_id/host_id 不存在（SQLite
+// FOREIGN KEY 约束兜底）400。响应不含 api_token 明文（模型本身就不暴露该列）。
+func (h *AdminClaudeAccountsHandler) Create() nethttp.Handler {
+	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		var req createClaudeAccountRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "invalid request body"})
+			return
+		}
+
+		req.UserID = strings.TrimSpace(req.UserID)
+		req.Email = strings.TrimSpace(req.Email)
+		req.DisplayName = strings.TrimSpace(req.DisplayName)
+		if req.UserID == "" {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "user_id is required"})
+			return
+		}
+		if req.Email == "" || !strings.Contains(req.Email, "@") {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "email is required and must contain @"})
+			return
+		}
+		var hostID *string
+		if req.HostID != nil {
+			trimmed := strings.TrimSpace(*req.HostID)
+			if trimmed != "" {
+				hostID = &trimmed
+			}
+		}
+
+		account, err := h.store.CreateClaudeAccount(r.Context(), repository.CreateClaudeAccountParams{
+			UserID:      req.UserID,
+			Email:       req.Email,
+			DisplayName: req.DisplayName,
+			HostID:      hostID,
+		})
+		if err != nil {
+			errMsg := err.Error()
+			if isUniqueViolation(err) || strings.Contains(errMsg, "unique") || strings.Contains(errMsg, "duplicate") {
+				writeJSON(w, nethttp.StatusConflict, map[string]string{"error": "email already exists"})
+				return
+			}
+			if strings.Contains(errMsg, "FOREIGN KEY constraint failed") {
+				writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "user_id or host_id does not exist"})
+				return
+			}
+			h.logger.Error("create claude_account failed", "user_id", req.UserID, "email", req.Email, "error", err)
+			writeJSON(w, nethttp.StatusInternalServerError, map[string]string{"error": "create claude_account failed"})
+			return
+		}
+
+		var eventHostID any
+		if account.HostID != nil {
+			eventHostID = *account.HostID
+		}
+		h.recordEvent(r.Context(), "claude_account.created", "管理员创建 Claude 账号", map[string]any{
+			"account_id": account.ID,
+			"user_id":    account.UserID,
+			"email":      account.Email,
+			"host_id":    eventHostID,
+		})
+
+		writeJSON(w, nethttp.StatusCreated, map[string]any{"claude_account": account})
+	})
+}
+
 // SetAPIToken 设置账号的容器侧 API 凭据。对已绑定的运行中主机不实时下发：
 // 环境变量属 docker create 参数，变更需重建主机生效（响应中注明）。
 func (h *AdminClaudeAccountsHandler) SetAPIToken() nethttp.Handler {
@@ -97,7 +178,7 @@ func (h *AdminClaudeAccountsHandler) SetAPIToken() nethttp.Handler {
 			return
 		}
 
-		h.recordEvent(r.Context(), "claude_account.api_token_set", map[string]any{
+		h.recordEvent(r.Context(), "claude_account.api_token_set", "管理员设置 Claude 账号 API 凭据", map[string]any{
 			"account_id":   accountID,
 			"has_token":    req.APIToken != "",
 			"has_base_url": req.APIBaseURL != "",
@@ -156,7 +237,7 @@ func (h *AdminClaudeAccountsHandler) deleteStrict(w nethttp.ResponseWriter, r *n
 			Volumes: []agentapi.VolumeMount{{Name: volumeName}},
 		}
 		if _, err := runHostAction(ctx, h.agentClient, req); err != nil {
-			h.recordEvent(r.Context(), "claude_account.delete_volume_rm_failed", map[string]any{
+			h.recordEvent(r.Context(), "claude_account.delete_volume_rm_failed", "管理员删除 Claude 账号", map[string]any{
 				"account_id":    id,
 				"volume_name":   volumeName,
 				"error_code":    "volume_in_use",
@@ -185,7 +266,7 @@ func (h *AdminClaudeAccountsHandler) deleteStrict(w nethttp.ResponseWriter, r *n
 	}
 	rollback = false
 
-	h.recordEvent(r.Context(), "claude_account.deleted", map[string]any{
+	h.recordEvent(r.Context(), "claude_account.deleted", "管理员删除 Claude 账号", map[string]any{
 		"account_id":  id,
 		"volume_name": volumeName,
 		"force":       false,
@@ -237,7 +318,7 @@ func (h *AdminClaudeAccountsHandler) deleteForce(w nethttp.ResponseWriter, r *ne
 			Labels:  map[string]string{"force": "true"},
 		}
 		if _, err := runHostAction(ctx, h.agentClient, req); err != nil {
-			h.recordEvent(r.Context(), "claude_account.force_volume_rm_failed", map[string]any{
+			h.recordEvent(r.Context(), "claude_account.force_volume_rm_failed", "管理员删除 Claude 账号", map[string]any{
 				"account_id":    id,
 				"volume_name":   volumeName,
 				"error_message": err.Error(),
@@ -248,7 +329,7 @@ func (h *AdminClaudeAccountsHandler) deleteForce(w nethttp.ResponseWriter, r *ne
 			resp["volume_rm"] = "succeeded"
 		}
 	}
-	h.recordEvent(r.Context(), "claude_account.deleted", map[string]any{
+	h.recordEvent(r.Context(), "claude_account.deleted", "管理员删除 Claude 账号", map[string]any{
 		"account_id":  id,
 		"volume_name": volumeName,
 		"force":       true,
@@ -256,14 +337,14 @@ func (h *AdminClaudeAccountsHandler) deleteForce(w nethttp.ResponseWriter, r *ne
 	writeJSON(w, nethttp.StatusOK, resp)
 }
 
-func (h *AdminClaudeAccountsHandler) recordEvent(ctx context.Context, eventType string, metadata map[string]any) {
+func (h *AdminClaudeAccountsHandler) recordEvent(ctx context.Context, eventType, message string, metadata map[string]any) {
 	if h.events == nil {
 		return
 	}
 	if _, err := h.events.RecordEvent(ctx, repository.RecordEventParams{
 		Level:    "info",
 		Type:     eventType,
-		Message:  "管理员删除 Claude 账号",
+		Message:  message,
 		Metadata: metadata,
 	}); err != nil {
 		h.logger.Error("record event failed", "type", eventType, "error", err)

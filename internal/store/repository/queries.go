@@ -114,7 +114,7 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, userID string, pass
 
 // listHostsByUserIDSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const listHostsByUserIDSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts WHERE user_id = ?
 	ORDER BY created_at ASC
 `
@@ -132,7 +132,7 @@ func (r *Repository) ListHostsByUserID(ctx context.Context, userID string) ([]Ho
 		var rawMounts jsonText
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Status, &item.ShortID, &item.TemplateImageRef,
-			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname,
+			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 			&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 			&rawMounts,
 			&item.CreatedAt, &item.UpdatedAt,
@@ -194,7 +194,7 @@ func (r *Repository) GetDashboardStats(ctx context.Context) (DashboardStats, err
 
 // listHostsSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const listHostsSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts
 	ORDER BY updated_at DESC
 `
@@ -220,6 +220,7 @@ func (r *Repository) ListHosts(ctx context.Context) ([]Host, error) {
 			&item.SlotKey,
 			&item.Timezone,
 			&item.Hostname,
+			&item.DisguiseCPUModel,
 			&item.MemoryLimitMB,
 			&item.CPULimit,
 			&item.PidsLimit,
@@ -265,7 +266,7 @@ func (r *Repository) GetPrimaryHostByUserID(ctx context.Context, userID string) 
 	var item Host
 	var rawMounts jsonText
 	if err := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+		SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 		FROM hosts
 		WHERE user_id = ? AND slot_key = 'primary'
 		LIMIT 1
@@ -279,6 +280,7 @@ func (r *Repository) GetPrimaryHostByUserID(ctx context.Context, userID string) 
 		&item.SlotKey,
 		&item.Timezone,
 		&item.Hostname,
+		&item.DisguiseCPUModel,
 		&item.MemoryLimitMB,
 		&item.CPULimit,
 		&item.PidsLimit,
@@ -657,7 +659,7 @@ func (r *Repository) GetHostDetail(ctx context.Context, hostID string) (HostDeta
 // listHostsWithUsernameSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const listHostsWithUsernameSQL = `
 	SELECT h.id, h.user_id, h.status, COALESCE(h.short_id, ''), h.template_image_ref,
-	       h.home_volume_name, h.slot_key, h.timezone, h.hostname,
+	       h.home_volume_name, h.slot_key, h.timezone, h.hostname, h.disguise_cpu_model,
 	       h.memory_limit_mb, h.cpu_limit, h.pids_limit,
 	       h.host_mounts, h.created_at, h.updated_at, u.username,
 	       e.label, e.ip_address, e.detected_ip_address
@@ -681,7 +683,7 @@ func (r *Repository) ListHostsWithUsername(ctx context.Context) ([]HostWithUsern
 		var rawMounts jsonText
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Status, &item.ShortID, &item.TemplateImageRef,
-			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname,
+			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 			&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 			&rawMounts,
 			&item.CreatedAt, &item.UpdatedAt,
@@ -758,7 +760,7 @@ func (r *Repository) GetEgressIPByHost(ctx context.Context, hostID string) (Egre
 
 // getHostSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const getHostSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts
 	WHERE id = ?
 `
@@ -776,6 +778,7 @@ func (r *Repository) GetHost(ctx context.Context, hostID string) (Host, error) {
 		&item.SlotKey,
 		&item.Timezone,
 		&item.Hostname,
+		&item.DisguiseCPUModel,
 		&item.MemoryLimitMB,
 		&item.CPULimit,
 		&item.PidsLimit,
@@ -996,7 +999,7 @@ func (r *Repository) UpdateUserExpiry(ctx context.Context, userID string, expire
 
 // listRunningHostsByUserIDSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const listRunningHostsByUserIDSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts
 	WHERE user_id = ? AND status = 'running'
 `
@@ -1014,7 +1017,7 @@ func (r *Repository) ListRunningHostsByUserID(ctx context.Context, userID string
 		var rawMounts jsonText
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Status, &item.ShortID, &item.TemplateImageRef,
-			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname,
+			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 			&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 			&rawMounts,
 			&item.CreatedAt, &item.UpdatedAt,
@@ -1034,7 +1037,7 @@ func (r *Repository) ListRunningHostsByUserID(ctx context.Context, userID string
 
 // listRunningHostsSQL 将 SQL 文本提升为包级常量，方便仓储层回归测试断言。
 const listRunningHostsSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts
 	WHERE status = 'running'
 	ORDER BY updated_at ASC
@@ -1042,7 +1045,7 @@ const listRunningHostsSQL = `
 
 // listFailedHostsSQL 查询 status='failed' 的主机，供 reconciler 自动恢复。
 const listFailedHostsSQL = `
-	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
+	SELECT id, user_id, status, COALESCE(short_id, ''), template_image_ref, home_volume_name, slot_key, timezone, hostname, disguise_cpu_model, memory_limit_mb, cpu_limit, pids_limit, host_mounts, created_at, updated_at
 	FROM hosts
 	WHERE status = 'failed'
 	ORDER BY updated_at ASC
@@ -1061,7 +1064,7 @@ func (r *Repository) ListRunningHosts(ctx context.Context) ([]Host, error) {
 		var rawMounts jsonText
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Status, &item.ShortID, &item.TemplateImageRef,
-			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname,
+			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 			&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 			&rawMounts,
 			&item.CreatedAt, &item.UpdatedAt,
@@ -1092,7 +1095,7 @@ func (r *Repository) ListFailedHosts(ctx context.Context) ([]Host, error) {
 		var rawMounts jsonText
 		if err := rows.Scan(
 			&item.ID, &item.UserID, &item.Status, &item.ShortID, &item.TemplateImageRef,
-			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname,
+			&item.HomeVolumeName, &item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 			&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 			&rawMounts,
 			&item.CreatedAt, &item.UpdatedAt,
@@ -1607,7 +1610,7 @@ const getHostWithClaudeAccountSQL = `
 	SELECT
 		h.id, h.user_id, h.status, COALESCE(h.short_id, ''),
 		h.template_image_ref, h.home_volume_name,
-		h.slot_key, h.timezone, h.hostname, h.memory_limit_mb, h.cpu_limit, h.pids_limit,
+		h.slot_key, h.timezone, h.hostname, h.disguise_cpu_model, h.memory_limit_mb, h.cpu_limit, h.pids_limit,
 		h.host_mounts, h.created_at, h.updated_at,
 		COALESCE(ca.persistent_volume_name, '')
 	FROM hosts h
@@ -1624,7 +1627,7 @@ func (r *Repository) GetHostWithClaudeAccount(ctx context.Context, hostID string
 	if err := r.db.QueryRowContext(ctx, getHostWithClaudeAccountSQL, hostID).Scan(
 		&item.ID, &item.UserID, &item.Status, &item.ShortID,
 		&item.TemplateImageRef, &item.HomeVolumeName,
-		&item.SlotKey, &item.Timezone, &item.Hostname,
+		&item.SlotKey, &item.Timezone, &item.Hostname, &item.DisguiseCPUModel,
 		&item.MemoryLimitMB, &item.CPULimit, &item.PidsLimit,
 		&rawMounts,
 		&item.CreatedAt, &item.UpdatedAt,
@@ -1706,4 +1709,67 @@ func (r *Repository) GetClaudeAccountAPIToken(ctx context.Context, accountID str
 		return "", "", err
 	}
 	return token, baseURL, nil
+}
+
+const createClaudeAccountSQL = `
+	INSERT INTO claude_accounts (id, user_id, host_id, email, display_name, status)
+	VALUES (?, ?, ?, ?, ?, 'active')
+	RETURNING id, user_id, host_id, email, display_name, status, created_at, updated_at
+`
+
+// CreateClaudeAccount 新建 claude_account（补齐上游 Phase 33 缺失的创建入口）。
+// id 由本方法生成（uuid v4，与 CreateUser / CreateTask 保持一致）；
+// HostID 可空表示创建时尚未绑定宿主机；persistent_volume_name 保持 NULL，
+// 由后续分配流程写入。email 撞 UNIQUE 约束时原样返回 SQLite 错误，
+// 由 handler 识别后转 409。
+func (r *Repository) CreateClaudeAccount(ctx context.Context, params CreateClaudeAccountParams) (ClaudeAccount, error) {
+	if params.UserID == "" {
+		return ClaudeAccount{}, fmt.Errorf("create claude_account: empty user id")
+	}
+	if params.Email == "" {
+		return ClaudeAccount{}, fmt.Errorf("create claude_account: empty email")
+	}
+	var item ClaudeAccount
+	if err := r.db.QueryRowContext(ctx, createClaudeAccountSQL,
+		uuid.NewString(),
+		params.UserID,
+		params.HostID,
+		params.Email,
+		params.DisplayName,
+	).Scan(
+		&item.ID,
+		&item.UserID,
+		&item.HostID,
+		&item.Email,
+		&item.DisplayName,
+		&item.Status,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	); err != nil {
+		return ClaudeAccount{}, fmt.Errorf("create claude_account: %w", err)
+	}
+	return item, nil
+}
+
+const updateHostDisguiseCPUModelSQL = `
+	UPDATE hosts
+	SET disguise_cpu_model = ?, updated_at = CURRENT_TIMESTAMP
+	WHERE id = ?
+`
+
+// UpdateHostDisguiseCPUModel 设置主机的伪装 CPU 型号（migration 0006）。
+// model 传空串即清除，容器侧回落镜像默认伪装（AMD EPYC 7763）。
+// 主机不存在时返回 sql.ErrNoRows，供 admin API 区分 404。
+func (r *Repository) UpdateHostDisguiseCPUModel(ctx context.Context, hostID string, model string) error {
+	if hostID == "" {
+		return fmt.Errorf("update host disguise_cpu_model: empty host id")
+	}
+	tag, err := r.db.ExecContext(ctx, updateHostDisguiseCPUModelSQL, model, hostID)
+	if err != nil {
+		return fmt.Errorf("update host disguise_cpu_model: %w", err)
+	}
+	if n, _ := tag.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

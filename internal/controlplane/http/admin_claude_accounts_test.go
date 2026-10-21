@@ -22,11 +22,17 @@ import (
 // sqliteAccountStore 使用内存 SQLite 实现 AdminClaudeAccountStore。
 // BeginTx 返回真正的 *sql.Tx，handler 会把 tx 传给 repository.LockClaudeAccountForDelete
 // 与 repository.DeleteClaudeAccountTx——这两个函数现在直接操作 *sql.Tx。
+// CreateClaudeAccount 直接转发给真实 repository 实现，让测试跑生产 SQL 路径。
 type sqliteAccountStore struct {
 	db       *sql.DB
+	repo     *repository.Repository
 	beginErr error
 	beginCnt int
 	beginCtx context.Context
+}
+
+func (s *sqliteAccountStore) CreateClaudeAccount(ctx context.Context, params repository.CreateClaudeAccountParams) (repository.ClaudeAccount, error) {
+	return s.repo.CreateClaudeAccount(ctx, params)
 }
 
 func (s *sqliteAccountStore) UpdateClaudeAccountAPIToken(ctx context.Context, accountID, token, baseURL string) error {
@@ -45,7 +51,8 @@ func (s *sqliteAccountStore) BeginTx(ctx context.Context) (*sql.Tx, error) {
 	return s.db.BeginTx(ctx, nil)
 }
 
-// newSQLiteAccountStore 创建内存 SQLite 并建好 claude_accounts 表的最小列集。
+// newSQLiteAccountStore 创建内存 SQLite，按 0001/0005 迁移的真实列集建表
+// （仅 handler 路径需要的最小列），并预置 FK 依赖的 users 行。
 func newSQLiteAccountStore(t *testing.T) *sqliteAccountStore {
 	t.Helper()
 	db, err := sql.Open("sqlite", ":memory:")
@@ -62,31 +69,51 @@ func newSQLiteAccountStore(t *testing.T) *sqliteAccountStore {
 			t.Fatalf("pragma %s: %v", pragma, err)
 		}
 	}
-	// 建表：仅 claude_accounts（handler 路径需要）。
+	// 建表：users / hosts（FK 依赖）+ claude_accounts（handler 路径需要）。
+	// 时间列声明为 DATETIME（与真实迁移一致）：modernc 驱动按声明类型
+	// 把 TEXT 时间值转换成 time.Time，模型才能直接 Scan。
 	_, err = db.ExecContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS users (
+			id         TEXT PRIMARY KEY,
+			username   TEXT NOT NULL UNIQUE,
+			created_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+			updated_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+		);
+		CREATE TABLE IF NOT EXISTS hosts (
+			id         TEXT PRIMARY KEY,
+			user_id    TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+			created_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+			updated_at DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+		);
 		CREATE TABLE IF NOT EXISTS claude_accounts (
-			id          TEXT PRIMARY KEY,
-			user_id     TEXT,
-			account_id  TEXT UNIQUE NOT NULL,
-			provider    TEXT NOT NULL DEFAULT '',
-			status      TEXT NOT NULL DEFAULT 'active',
-			persistent_volume_name TEXT NOT NULL DEFAULT '',
-			created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-		)
+			id                     TEXT PRIMARY KEY,
+			user_id                TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+			host_id                TEXT REFERENCES hosts (id) ON DELETE SET NULL,
+			email                  TEXT NOT NULL,
+			display_name           TEXT NOT NULL DEFAULT '',
+			status                 TEXT NOT NULL DEFAULT 'active',
+			created_at             DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+			updated_at             DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+			persistent_volume_name TEXT,
+			api_token              TEXT NOT NULL DEFAULT '',
+			api_base_url           TEXT NOT NULL DEFAULT ''
+		);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_claude_accounts_email ON claude_accounts (email);
+		INSERT INTO users (id, username) VALUES ('u-1', 'user-one');
 	`)
 	if err != nil {
 		t.Fatalf("create table: %v", err)
 	}
-	return &sqliteAccountStore{db: db}
+	return &sqliteAccountStore{db: db, repo: repository.New(db)}
 }
 
-// seedClaudeAccount 插入一条 claude_account 行，供 handler 删除。
+// seedClaudeAccount 插入一条 claude_account 行（email 固定 user@example.com），
+// 供 handler 删除 / email 冲突用例使用。
 func (s *sqliteAccountStore) seedClaudeAccount(t *testing.T, id, volumeName string) {
 	t.Helper()
 	_, err := s.db.ExecContext(context.Background(),
-		`INSERT INTO claude_accounts (id, user_id, account_id, provider, status, persistent_volume_name)
-		 VALUES (?, 'u-1', 'user@example.com', 'anthropic', 'active', ?)`,
+		`INSERT INTO claude_accounts (id, user_id, email, display_name, status, persistent_volume_name)
+		 VALUES (?, 'u-1', 'user@example.com', 'Seeded', 'active', ?)`,
 		id, volumeName)
 	if err != nil {
 		t.Fatalf("seed claude_account: %v", err)
@@ -98,8 +125,122 @@ func newAdminClaudeAccountsTestRouter(t *testing.T, store AdminClaudeAccountStor
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	handler := NewAdminClaudeAccountsHandler(logger, store, nil, events)
 	mux := nethttp.NewServeMux()
+	mux.Handle("POST /v1/admin/claude-accounts", handler.Create())
 	mux.Handle("DELETE /v1/admin/claude-accounts/{accountID}", handler.Delete())
 	return mux, func() {}
+}
+
+func TestAdminClaudeAccountsCreate_Success_201AuditEventAndDBRow(t *testing.T) {
+	store := newSQLiteAccountStore(t)
+	if _, err := store.db.ExecContext(context.Background(),
+		`INSERT INTO hosts (id, user_id) VALUES ('host-1', 'u-1')`); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	events := &stubEventRecorder{}
+
+	mux, _ := newAdminClaudeAccountsTestRouter(t, store, events)
+	body := `{"user_id":"u-1","email":"new@example.com","display_name":"Primary","host_id":"host-1"}`
+	req := httptest.NewRequest(nethttp.MethodPost, "/v1/admin/claude-accounts", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != nethttp.StatusCreated {
+		t.Fatalf("want 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		ClaudeAccount repository.ClaudeAccount `json:"claude_account"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("body must be JSON: %v", err)
+	}
+	acct := resp.ClaudeAccount
+	if acct.ID == "" {
+		t.Error("created account id must be non-empty")
+	}
+	if acct.UserID != "u-1" || acct.Email != "new@example.com" || acct.DisplayName != "Primary" {
+		t.Errorf("unexpected account fields: %+v", acct)
+	}
+	if acct.Status != "active" {
+		t.Errorf("status must default to active, got %q", acct.Status)
+	}
+	if acct.HostID == nil || *acct.HostID != "host-1" {
+		t.Errorf("host_id must round-trip host-1, got %v", acct.HostID)
+	}
+	if acct.PersistentVolumeName != nil {
+		t.Errorf("persistent_volume_name must stay unassigned at creation, got %v", *acct.PersistentVolumeName)
+	}
+
+	if !events.hasType("claude_account.created") {
+		t.Error("audit event claude_account.created must be emitted")
+	}
+
+	var volumeName sql.NullString
+	var status string
+	if err := store.db.QueryRowContext(context.Background(),
+		`SELECT status, persistent_volume_name FROM claude_accounts WHERE id = ?`, acct.ID).
+		Scan(&status, &volumeName); err != nil {
+		t.Fatalf("row must exist in DB: %v", err)
+	}
+	if status != "active" || volumeName.Valid {
+		t.Errorf("DB row mismatch: status=%q volume=%v", status, volumeName)
+	}
+}
+
+func TestAdminClaudeAccountsCreate_DuplicateEmail_409(t *testing.T) {
+	store := newSQLiteAccountStore(t)
+	store.seedClaudeAccount(t, "acct-1", "")
+	events := &stubEventRecorder{}
+
+	mux, _ := newAdminClaudeAccountsTestRouter(t, store, events)
+	body := `{"user_id":"u-1","email":"user@example.com"}`
+	req := httptest.NewRequest(nethttp.MethodPost, "/v1/admin/claude-accounts", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != nethttp.StatusConflict {
+		t.Fatalf("want 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("body must be JSON: %v", err)
+	}
+	if resp["error"] != "email already exists" {
+		t.Errorf("error must be email already exists, got %v", resp["error"])
+	}
+	if events.hasType("claude_account.created") {
+		t.Error("duplicate create must not emit claude_account.created")
+	}
+	var cnt int
+	if err := store.db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM claude_accounts WHERE email = 'user@example.com'`).Scan(&cnt); err != nil {
+		t.Fatal(err)
+	}
+	if cnt != 1 {
+		t.Errorf("duplicate email must not create a second row, got count=%d", cnt)
+	}
+}
+
+func TestAdminClaudeAccountsCreate_ValidationErrors_400(t *testing.T) {
+	store := newSQLiteAccountStore(t)
+	mux, _ := newAdminClaudeAccountsTestRouter(t, store, &stubEventRecorder{})
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"missing user_id", `{"email":"a@example.com"}`},
+		{"missing email", `{"user_id":"u-1"}`},
+		{"email without at", `{"user_id":"u-1","email":"not-an-email"}`},
+		{"invalid json", `not-json`},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest(nethttp.MethodPost, "/v1/admin/claude-accounts", strings.NewReader(tc.body))
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		if rr.Code != nethttp.StatusBadRequest {
+			t.Errorf("%s: want 400, got %d body=%s", tc.name, rr.Code, rr.Body.String())
+		}
+	}
 }
 
 func TestAdminClaudeAccountsDelete_StrictSuccess_DBDeletedAndAuditEventEmitted(t *testing.T) {

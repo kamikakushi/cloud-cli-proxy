@@ -725,6 +725,47 @@ start_vnc_watchdog_async() {
   echo "[entrypoint] VNC watchdog starting in background (pid=$!)"
 }
 
+HOST_KEY_STORE=/workspace/.ssh-host-keys
+
+# Host key 治理：镜像烤入的 /etc/ssh/ssh_host_* 被所有容器共享（安全隐患），
+# 且镜像切换时会导致客户端 known_hosts 报警。改为每主机唯一 + 跨 rebuild 稳定：
+#   - 优先从持久卷 /workspace/.ssh-host-keys 回载 ed25519 host key
+#   - 不存在则清掉镜像烤入的 key 后 ssh-keygen -A 全新生成，并持久化 ed25519
+# 存储目录保持 root:root 0700、私钥 0600，防止 workspace 用户读取。
+setup_ssh_host_keys() {
+  mkdir -p "$HOST_KEY_STORE"
+  chmod 0700 "$HOST_KEY_STORE"
+
+  # 无论回载还是生成，先清掉镜像烤入的共享 key，杜绝其进入 sshd。
+  rm -f /etc/ssh/ssh_host_*
+
+  if [ -s "$HOST_KEY_STORE/ssh_host_ed25519_key" ] && [ -s "$HOST_KEY_STORE/ssh_host_ed25519_key.pub" ]; then
+    cp "$HOST_KEY_STORE/ssh_host_ed25519_key" /etc/ssh/ssh_host_ed25519_key
+    cp "$HOST_KEY_STORE/ssh_host_ed25519_key.pub" /etc/ssh/ssh_host_ed25519_key.pub
+    chmod 0600 /etc/ssh/ssh_host_ed25519_key
+    chmod 0644 /etc/ssh/ssh_host_ed25519_key.pub
+    echo "[entrypoint] ssh host keys: loaded-from=persistent-volume"
+  else
+    ssh-keygen -A
+    cp /etc/ssh/ssh_host_ed25519_key "$HOST_KEY_STORE/ssh_host_ed25519_key"
+    cp /etc/ssh/ssh_host_ed25519_key.pub "$HOST_KEY_STORE/ssh_host_ed25519_key.pub"
+    chmod 0600 "$HOST_KEY_STORE/ssh_host_ed25519_key"
+    chmod 0644 "$HOST_KEY_STORE/ssh_host_ed25519_key.pub"
+    echo "[entrypoint] ssh host keys: generated"
+  fi
+
+  enforce_ssh_host_key_store_perms
+}
+
+# /workspace 整体 chown 给用户后会被覆盖，需恢复 host key 存储的
+# root 属主与权限（root:root + 0700/0600，用户不可读）。
+enforce_ssh_host_key_store_perms() {
+  chown -R root:root "$HOST_KEY_STORE" 2>/dev/null || true
+  chmod 0700 "$HOST_KEY_STORE"
+  chmod 0600 "$HOST_KEY_STORE/ssh_host_ed25519_key" 2>/dev/null || true
+  chmod 0644 "$HOST_KEY_STORE/ssh_host_ed25519_key.pub" 2>/dev/null || true
+}
+
 # SSH setup
 mkdir -p /var/run/sshd
 
@@ -732,9 +773,8 @@ mkdir -p /var/run/sshd
 # 需先进入 PID 1 环境，sshd 会话与 VNC 桌面才能继承。
 prepare_container_disguise
 
-if ! ls /etc/ssh/ssh_host_*_key >/dev/null 2>&1; then
-  ssh-keygen -A
-fi
+# host key 回载/生成（sshd 启动前，见 start_sshd_or_die）
+setup_ssh_host_keys
 
 CONTAINER_USER="${CONTAINER_USER:-workspace}"
 CONTAINER_PASSWORD="${CONTAINER_SSH_PASSWORD:-workspace}"
@@ -773,6 +813,9 @@ mkdir -p /workspace/.ssh
 # 避免在 virtiofs/FUSE 文件系统上遍历海量文件导致卡死。
 find /workspace -xdev -exec chown "${RUN_USER}:${RUN_USER}" {} + 2>/dev/null || true
 chmod 0700 /workspace/.ssh
+
+# 上面的 chown 会把 $HOST_KEY_STORE 也交给用户，这里收回 root 属主并恢复权限。
+enforce_ssh_host_key_store_perms
 
 # 注入 SSH 公钥（local 模式或显式传入时）
 if [ -n "${CONTAINER_SSH_AUTHORIZED_KEY:-}" ]; then
