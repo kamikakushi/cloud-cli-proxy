@@ -144,9 +144,9 @@ prepare_container_disguise() {
   echo "$mid" > /var/lib/dbus/machine-id 2>/dev/null || true
   chmod 444 /etc/machine-id
 
-  # 时区伪装：与出口 IP 地理位置配套（由控制面经 DISGUISE_TZ 注入，缺省美东）。
-  # 同时作用于 Date/Intl（TZ 变量）与 shell 工具（/etc/localtime），三层一致。
-  local tz="${DISGUISE_TZ:-America/New_York}"
+  # 时区伪装：优先 DISGUISE_TZ，其次复用容器注入的 TZ（控制面按出口 IP
+  # 地理下发），最后缺省美东——避免覆盖控制面与出口配套的时区造成穿帮。
+  local tz="${DISGUISE_TZ:-${TZ:-America/New_York}}"
   if [ -f "/usr/share/zoneinfo/${tz}" ]; then
     echo "$tz" > /etc/timezone
     ln -sfn "/usr/share/zoneinfo/${tz}" /etc/localtime
