@@ -2,9 +2,11 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	nethttp "net/http"
+	"strings"
 	"time"
 
 	"database/sql"
@@ -16,6 +18,8 @@ import (
 // AdminClaudeAccountStore 暴露 Plan 02 仅需的最小集（与 AdminHostStore 风格一致）。
 type AdminClaudeAccountStore interface {
 	BeginTx(ctx context.Context) (*sql.Tx, error)
+	// UpdateClaudeAccountAPIToken 设置账号的容器侧 API 凭据（migration 0005）。
+	UpdateClaudeAccountAPIToken(ctx context.Context, accountID, token, baseURL string) error
 }
 
 // HostActionRunner 抽象 host-agent 调用，让 handler 在 embedded（in-process worker）和
@@ -50,6 +54,62 @@ func (h *AdminClaudeAccountsHandler) Delete() nethttp.Handler {
 			return
 		}
 		h.deleteStrict(w, r, accountID)
+	})
+}
+
+type setAPITokenRequest struct {
+	// APIToken 支持 Anthropic 官方 key（sk-ant-api*，注入 ANTHROPIC_API_KEY）
+	// 或网关 Bearer token（注入 ANTHROPIC_AUTH_TOKEN）；空串清除。
+	APIToken string `json:"api_token"`
+	// APIBaseURL 可选中转网关，注入 ANTHROPIC_BASE_URL；空串清除。
+	APIBaseURL string `json:"api_base_url"`
+}
+
+// SetAPIToken 设置账号的容器侧 API 凭据。对已绑定的运行中主机不实时下发：
+// 环境变量属 docker create 参数，变更需重建主机生效（响应中注明）。
+func (h *AdminClaudeAccountsHandler) SetAPIToken() nethttp.Handler {
+	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		accountID := r.PathValue("accountID")
+
+		var req setAPITokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "invalid request body"})
+			return
+		}
+		req.APIToken = strings.TrimSpace(req.APIToken)
+		req.APIBaseURL = strings.TrimSpace(req.APIBaseURL)
+		if req.APIBaseURL != "" && req.APIToken == "" {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "api_base_url requires api_token"})
+			return
+		}
+		if req.APIBaseURL != "" && !strings.HasPrefix(req.APIBaseURL, "http://") && !strings.HasPrefix(req.APIBaseURL, "https://") {
+			writeJSON(w, nethttp.StatusBadRequest, map[string]string{"error": "api_base_url must start with http:// or https://"})
+			return
+		}
+
+		if err := h.store.UpdateClaudeAccountAPIToken(r.Context(), accountID, req.APIToken, req.APIBaseURL); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeJSON(w, nethttp.StatusNotFound, map[string]string{"error": "claude_account not found"})
+				return
+			}
+			h.logger.Error("set claude_account api token failed", "account_id", accountID, "error", err)
+			writeJSON(w, nethttp.StatusInternalServerError, map[string]string{"error": "set api token failed"})
+			return
+		}
+
+		h.recordEvent(r.Context(), "claude_account.api_token_set", map[string]any{
+			"account_id":   accountID,
+			"has_token":    req.APIToken != "",
+			"has_base_url": req.APIBaseURL != "",
+			"key_flavor":   map[bool]string{true: "api_key", false: "none"}[strings.HasPrefix(req.APIToken, "sk-ant-api")],
+		})
+
+		writeJSON(w, nethttp.StatusOK, map[string]any{
+			"account_id":   accountID,
+			"has_token":    req.APIToken != "",
+			"has_base_url": req.APIBaseURL != "",
+			"note":         "环境变量在容器创建时注入；已存在的宿主机需 rebuild 后生效",
+		})
 	})
 }
 

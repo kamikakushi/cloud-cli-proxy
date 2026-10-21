@@ -287,6 +287,7 @@ func NewRouter(deps Dependencies) nethttp.Handler {
 		if deps.AdminClaudeAccounts != nil {
 			claudeHandler := NewAdminClaudeAccountsHandler(deps.Logger, deps.AdminClaudeAccounts, deps.AgentClient, deps.EventRecorder)
 			mux.Handle("DELETE /v1/admin/claude-accounts/{accountID}", adminGuard(claudeHandler.Delete()))
+			mux.Handle("PUT /v1/admin/claude-accounts/{accountID}/api-token", adminGuard(claudeHandler.SetAPIToken()))
 		}
 
 		if deps.ImageCache != nil {

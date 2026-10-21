@@ -1669,3 +1669,41 @@ func DeleteClaudeAccountTx(ctx context.Context, tx *sql.Tx, id string) error {
 	}
 	return nil
 }
+
+const updateClaudeAccountAPITokenSQL = `
+	UPDATE claude_accounts
+	SET api_token = ?, api_base_url = ?, updated_at = CURRENT_TIMESTAMP
+	WHERE id = ?
+`
+
+const getClaudeAccountAPITokenSQL = `
+	SELECT api_token, api_base_url FROM claude_accounts WHERE id = ?
+`
+
+// UpdateClaudeAccountAPIToken 设置账号的容器侧 API 凭据（0005 migration）。
+// token/baseURL 传空串即清除，表示回落到容器内交互式登录凭据。
+func (r *Repository) UpdateClaudeAccountAPIToken(ctx context.Context, accountID, token, baseURL string) error {
+	if accountID == "" {
+		return fmt.Errorf("update claude_account api token: empty account id")
+	}
+	tag, err := r.db.ExecContext(ctx, updateClaudeAccountAPITokenSQL, token, baseURL, accountID)
+	if err != nil {
+		return fmt.Errorf("update claude_account api token: %w", err)
+	}
+	if n, _ := tag.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// GetClaudeAccountAPIToken 返回账号的 api_token 与 api_base_url。
+func (r *Repository) GetClaudeAccountAPIToken(ctx context.Context, accountID string) (token, baseURL string, err error) {
+	if accountID == "" {
+		return "", "", fmt.Errorf("get claude_account api token: empty account id")
+	}
+	err = r.db.QueryRowContext(ctx, getClaudeAccountAPITokenSQL, accountID).Scan(&token, &baseURL)
+	if err != nil {
+		return "", "", err
+	}
+	return token, baseURL, nil
+}

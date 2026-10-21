@@ -29,6 +29,13 @@ type sqliteAccountStore struct {
 	beginCtx context.Context
 }
 
+func (s *sqliteAccountStore) UpdateClaudeAccountAPIToken(ctx context.Context, accountID, token, baseURL string) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE claude_accounts SET api_token = ?, api_base_url = ? WHERE id = ?",
+		token, baseURL, accountID)
+	return err
+}
+
 func (s *sqliteAccountStore) BeginTx(ctx context.Context) (*sql.Tx, error) {
 	s.beginCnt++
 	s.beginCtx = ctx

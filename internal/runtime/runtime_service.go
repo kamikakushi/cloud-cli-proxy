@@ -60,6 +60,9 @@ type QueueHostActionRepo interface {
 	// 优先匹配 host 显式绑定，否则回退到 user 未绑定 host 的最早账号。
 	// 用于 Phase 33 D-04..D-06：让 worker.createHost 在该字段非空时自动补 claude-state-<id> volume。
 	ResolveClaudeAccountIDForEntry(ctx context.Context, userID, hostID string) (string, bool, error)
+	// GetClaudeAccountAPIToken 返回账号的 api_token / api_base_url（migration 0005），
+	// 供 request 下发、worker 注入容器环境变量。
+	GetClaudeAccountAPIToken(ctx context.Context, accountID string) (token, baseURL string, err error)
 }
 
 type Service struct {
@@ -135,6 +138,22 @@ func (s *Service) QueueHostAction(ctx context.Context, hostID string, action age
 			"host_id", host.ID, "user_id", host.UserID, "error", claudeErr)
 	}
 
+	// migration 0005：账号配置了 api_token 时随 request 下发，worker 注入容器
+	// 环境变量（ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL）。
+	var claudeAPIToken, claudeAPIBaseURL string
+	if claudeAccountID != "" {
+		token, baseURL, tokenErr := s.repo.GetClaudeAccountAPIToken(ctx, claudeAccountID)
+		switch {
+		case tokenErr == nil:
+			claudeAPIToken, claudeAPIBaseURL = token, baseURL
+		case errors.Is(tokenErr, sql.ErrNoRows):
+			// 账号在 token 查询前被删除，罕见竞态：留空即可
+		default:
+			slog.Warn("load claude_account api token failed, container falls back to interactive login",
+				"host_id", host.ID, "claude_account_id", claudeAccountID, "error", tokenErr)
+		}
+	}
+
 	task, err := s.repo.CreateTask(ctx, repository.CreateTaskParams{
 		HostID:      &host.ID,
 		Kind:        string(action),
@@ -176,17 +195,19 @@ func (s *Service) QueueHostAction(ctx context.Context, hostID string, action age
 			"cloud-cli-proxy.host_id":  host.ID,
 			"cloud-cli-proxy.slot_key": firstNonEmpty(host.SlotKey, defaultManagedUserSlotKey),
 		},
-		Timezone:        host.Timezone,
-		Hostname:        host.Hostname,
-		MemoryLimitMB:   ptrToInt(host.MemoryLimitMB),
-		CPULimit:        ptrToFloat(host.CPULimit),
-		PidsLimit:       host.PidsLimit,
-		Username:        owner.Username,
-		EntryPassword:   owner.EntryPassword,
-		SSHPublicKey:    "",
-		SSHPrivateKey:   "",
-		SSHKeys:         keyEntries,
-		ClaudeAccountID: claudeAccountID,
+		Timezone:         host.Timezone,
+		Hostname:         host.Hostname,
+		MemoryLimitMB:    ptrToInt(host.MemoryLimitMB),
+		CPULimit:         ptrToFloat(host.CPULimit),
+		PidsLimit:        host.PidsLimit,
+		Username:         owner.Username,
+		EntryPassword:    owner.EntryPassword,
+		SSHPublicKey:     "",
+		SSHPrivateKey:    "",
+		SSHKeys:          keyEntries,
+		ClaudeAccountID:  claudeAccountID,
+		ClaudeAPIToken:   claudeAPIToken,
+		ClaudeAPIBaseURL: claudeAPIBaseURL,
 	}
 
 	// 宿主机 bind mount 映射：repository.HostMounts -> agentapi.BindMounts

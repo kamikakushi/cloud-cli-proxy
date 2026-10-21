@@ -67,6 +67,11 @@ type HostActionRequest struct {
 	// 组装 `claude-state-{claude_account_id}` volume 与容器 label 使用。
 	// `omitempty` 是契约：空串表示"本次 action 无账号维度"，禁止写入空字符串来表达"已分配但未知"。
 	ClaudeAccountID string `json:"claude_account_id,omitempty"`
+	// ClaudeAPIToken / ClaudeAPIBaseURL 来自 claude_accounts 的 api_token /
+	// api_base_url（migration 0005）。worker 按 token 前缀注入
+	// ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN；为空时容器走交互式登录凭据。
+	ClaudeAPIToken   string `json:"claude_api_token,omitempty"`
+	ClaudeAPIBaseURL string `json:"claude_api_base_url,omitempty"`
 	// BindMounts 携带宿主机目录 bind mount 配置，由 Runtime Service 从 repository.HostMounts 映射而来。
 	BindMounts []BindMount `json:"bind_mounts,omitempty"`
 	// BypassSnapshotID Phase 47 — 仅当 Action=ActionReloadHostBypass 时非空。

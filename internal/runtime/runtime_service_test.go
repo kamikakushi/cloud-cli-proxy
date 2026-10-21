@@ -53,6 +53,10 @@ func (s *stubQueueRepo) ListSSHKeysByUser(_ context.Context, _ string) ([]reposi
 func (s *stubQueueRepo) RecordEvent(_ context.Context, _ repository.RecordEventParams) (repository.Event, error) {
 	return repository.Event{}, nil
 }
+func (s *stubQueueRepo) GetClaudeAccountAPIToken(_ context.Context, _ string) (string, string, error) {
+	return "", "", nil
+}
+
 func (s *stubQueueRepo) ResolveClaudeAccountIDForEntry(_ context.Context, userID, hostID string) (string, bool, error) {
 	s.resolveCalls++
 	return s.resolveAccountID, s.resolveFound, s.resolveErr

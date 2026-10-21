@@ -317,6 +317,20 @@ func (w *Worker) buildCreateArgs(request agentapi.HostActionRequest, containerNa
 		"-v", fmt.Sprintf("%s:%s", homeDir, firstNonEmpty(request.HomeMount, defaultWorkspaceMount)),
 	)
 
+	// claude_accounts.api_token（migration 0005）：sk-ant-api* 前缀注入
+	// ANTHROPIC_API_KEY（官方 key 计费）；其余视为网关 Bearer token 注入
+	// ANTHROPIC_AUTH_TOKEN。配了 base_url 时一并注入 ANTHROPIC_BASE_URL。
+	if request.ClaudeAPIToken != "" {
+		if strings.HasPrefix(request.ClaudeAPIToken, "sk-ant-api") {
+			args = append(args, "-e", "ANTHROPIC_API_KEY="+request.ClaudeAPIToken)
+		} else {
+			args = append(args, "-e", "ANTHROPIC_AUTH_TOKEN="+request.ClaudeAPIToken)
+		}
+		if request.ClaudeAPIBaseURL != "" {
+			args = append(args, "-e", "ANTHROPIC_BASE_URL="+request.ClaudeAPIBaseURL)
+		}
+	}
+
 	for _, vm := range request.Volumes {
 		if vm.Name == "" || vm.Target == "" {
 			return nil, fmt.Errorf("invalid volume mount: name=%q target=%q", vm.Name, vm.Target)
